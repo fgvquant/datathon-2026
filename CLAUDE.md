@@ -187,6 +187,16 @@ R_e(estratégia) = R_e(CCI10) + π_e
   backtest nunca vê ataques futuros.
 - Fluxo Git: uma branch por tarefa (`modelo/`, `llm/`, `backtest/`, `dados/`), Pull Request revisado por outra
   pessoa do grupo, testes verdes antes do merge.
+- **Mensagens de commit (obrigatório)** seguem o [gitmoji](https://gitmoji.dev), no formato
+  `<emoji> comando: nome-do-commit`, com o emoji em código (`:sparkles:`), em minúsculas e em português. Exemplos:
+  - `:sparkles: feat: estima-var-x-empilhado`
+  - `:bug: fix: defasagens-nao-cruzam-janelas`
+  - `:white_check_mark: test: simula-var1-com-ataque`
+  - `:memo: docs: dicionario-das-bases`
+  - `:card_file_box: dados: janelas-placebo`
+  - `:recycle: refactor: separa-bootstrap-por-ataque`
+  
+  Escolha o emoji pela lista do gitmoji.dev conforme o tipo da mudança; um assunto por commit.
 
 ## 10. Como o Claude deve trabalhar aqui
 
