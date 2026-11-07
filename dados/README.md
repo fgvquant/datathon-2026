@@ -4,16 +4,16 @@ Todas as bases ficam aqui, organizadas por tipo. Horários sempre em UTC.
 
 | Pasta | Arquivo | Conteúdo | Situação |
 | --- | --- | --- | --- |
-| `eventos/` | `coleta_tweets_ataques_v19.xlsx` | primeiro anúncio de cada ataque | 583 ataques, 197 com horário |
-| `precos/` | `minuto_janela_ataques.csv` | velas de 1 min, ±3h em torno de cada anúncio, 10 moedas | adicionar; hoje cobre só os ataques antigos |
-| `placebo/` | `minuto_janela_placebo.csv` | mesmo formato, uma semana antes de cada ataque, sem ataque | a baixar |
+| `eventos/` | `coleta_tweets_ataques.xlsx` | primeiro anúncio de cada ataque | 197 ataques, todos com horário (recorte da v19; a v19 completa, com 583, está no histórico do Git) |
+| `precos/` | `minuto_janela_ataques.csv` | velas de 1 min, ±3h em torno de cada anúncio, 10 moedas | completo para os 197 ataques; versionado como `.csv.gz` |
+| `placebo/` | `minuto_janela_placebo.csv.gz` | mesmo formato, uma semana antes de cada ataque, sem ataque | gerado por `scripts/01_baixa_placebo.py` |
 | `cci10/` | série diária do CCI10 | pesos do benchmark | com um integrante do grupo |
-| `llm/` | respostas do LLM | uma resposta bruta por notícia e rodada | gerado pelo código |
+| `llm/` | `scores.csv` | `event_id`, `gravidade` (1–5, mediana das rodadas), `n_rodadas` | gerado fora deste repositório |
 
 Ao atualizar uma base, troque o arquivo e mude a versão no nome (ex.: `v19` → `v20`). Não edite à mão uma base
 gerada por código.
 
-## eventos/coleta_tweets_ataques_v19.xlsx
+## eventos/coleta_tweets_ataques.xlsx
 
 Aba `coleta`, uma linha por ataque. A aba `legenda` explica a coleta.
 
@@ -51,7 +51,9 @@ Formato longo: uma linha por ataque × moeda × minuto.
 | `hora_utc` | horário da vela |
 | `hora_referencia_utc` | horário do anúncio |
 | `open`, `high`, `low`, `close` | preços da vela |
-| `vela_ausente` | 1 se não houve negociação no minuto |
+| `volume`, `quote_volume`, `n_trades`, `taker_buy_base`, `taker_buy_quote` | volumes da vela (Binance) |
+| `vela_ausente` | a Binance não tem a vela; OHLC = último close, volumes 0 |
+| `sem_negocio` | vela sem negócios (`n_trades = 0`) |
 
 Checagens esperadas: 361 velas por ataque e moeda, nenhuma linha repetida, nenhum preço ≤ 0, máxima ≥ mínima e
 minuto 0 batendo com `hora_referencia_utc`.
