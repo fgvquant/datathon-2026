@@ -6,7 +6,7 @@ amostra:
   precos: dados/precos/minuto_janela_ataques.csv.gz
 
 modelo:
-  car_pre: [-10, 0]            # faixa da CAR pré (descritiva)
+  car_pre: [-30, 0]            # faixa da CAR pré (descritiva); era [−10, 0] até 08/11
   velas_tabela: [1, 2, 5, 10, 15, 30, 60, 180]
   vela_venda: 2                # vale e meia-vida contam a partir daqui (índice h = vela − 1)
   minutos_seguidos: 3

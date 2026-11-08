@@ -110,7 +110,7 @@ minuto naquela janela. No minuto +3 ele caiu −4 pb. O AR desse minuto é −4,
 A **CAR** é a soma dos AR desde a vela +1 até o minuto que interessa. Se os AR forem −5, −3, −2 e +1 pb nos minutos
 +1 a +4, a CAR em +4 é −9 pb: até ali a moeda caiu 9 pb a mais do que cairia sem o ataque.
 
-Há também a **CAR pré**: a soma dos AR de −10 até a vela 0. Ela serve para entender o fenômeno (a notícia vaza
+Há também a **CAR pré**: a soma dos AR de −30 até a vela 0 (era −10 até 08/11). Ela serve para entender o fenômeno (a notícia vaza
 antes do tweet), mas **não dá para operar** com isso, porque antes do tweet ninguém sabe do ataque.
 
 ### Por que não usamos faixas

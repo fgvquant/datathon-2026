@@ -66,24 +66,27 @@ Seguimos o *event study* clássico (MacKinlay, 1997), mas minuto a minuto.
 CR em pb, 151 ataques de 2020–2025, IC de 90% entre colchetes
 (`results/parametros/modelo/tabelas/base_tabela.csv`, gráfico em `graficos/base_curvas.png`):
 
-| Moeda | CAR pré (−10 a 0) | CR +10 | CR +30 | CR +60 | CR +60 placebo | Meia-vida (vela) |
+| Moeda | CAR pré (−30 a 0) | CR +10 | CR +30 | CR +60 | CR +60 placebo | Meia-vida (vela) |
 | --- | --- | --- | --- | --- | --- | --- |
-| BTC | −6,0 [−11,4; −0,7] | −4,5 [−8,2; −1,0] | −10,7 [−20,4; −2,0] | −14,9 [−25,0; −5,3] | −4,6 [−13,4; 3,9] | 35 |
-| ETH | −7,5 [−14,6; −1,0] | −6,6 [−11,7; −2,3] | −12,4 [−23,6; −2,4] | −23,8 [−41,2; −8,7] | −3,3 [−14,7; 8,4] | 36 |
-| BNB | −5,4 [−11,8; 1,2] | −6,1 [−13,3; 0,2] | −10,8 [−23,3; 1,3] | −21,5 [−43,5; −2,7] | −10,2 [−22,3; 1,4] | 39 |
-| XRP | −9,2 [−17,3; −1,6] | −11,5 [−19,6; −3,8] | −14,8 [−30,0; −0,7] | −22,1 [−47,2; 0,3] | −10,6 [−28,8; 7,2] | 36 |
-| ADA | −11,9 [−21,1; −3,2] | −8,8 [−15,9; −2,3] | −20,2 [−34,4; −6,3] | −29,3 [−52,5; −6,6] | −11,7 [−29,4; 5,4] | 36 |
-| TRX | 4,6 [−5,3; 19,6] | −6,7 [−12,2; −1,7] | −15,9 [−27,1; −5,9] | −27,5 [−42,9; −13,6] | 2,7 [−7,1; 12,7] | 27 |
-| LINK | −11,1 [−19,5; −3,2] | −13,6 [−20,8; −6,4] | −23,0 [−36,9; −10,1] | −35,3 [−56,0; −14,8] | −0,4 [−16,5; 16,1] | 36 |
-| XLM | −8,0 [−15,0; −0,9] | −5,1 [−11,9; 1,6] | −9,3 [−23,1; 4,0] | −6,9 [−29,1; 14,4] | −6,8 [−23,1; 9,7] | 12 |
-| BCH | −7,6 [−15,3; −0,3] | −9,9 [−17,2; −3,4] | −12,3 [−24,5; −0,7] | −14,6 [−34,5; 2,5] | 3,6 [−11,4; 20,2] | 17 |
-| LTC | −9,2 [−16,5; −2,2] | −8,6 [−14,9; −2,8] | −10,0 [−21,7; 1,3] | −17,5 [−36,7; 0,2] | −1,1 [−16,1; 13,7] | 37 |
+| BTC | −8,6 [−15,9; −1,1] | −4,5 [−8,2; −1,0] | −10,7 [−20,4; −2,0] | −14,9 [−25,0; −5,3] | −4,6 [−13,4; 3,9] | 35 |
+| ETH | −11,3 [−21,9; −1,2] | −6,6 [−11,7; −2,3] | −12,4 [−23,6; −2,4] | −23,8 [−41,2; −8,7] | −3,3 [−14,7; 8,4] | 36 |
+| BNB | −8,9 [−19,4; 1,2] | −6,1 [−13,3; 0,2] | −10,8 [−23,3; 1,3] | −21,5 [−43,5; −2,7] | −10,2 [−22,3; 1,4] | 39 |
+| XRP | −14,2 [−25,6; −3,2] | −11,5 [−19,6; −3,8] | −14,8 [−30,0; −0,7] | −22,1 [−47,2; 0,3] | −10,6 [−28,8; 7,2] | 36 |
+| ADA | −30,5 [−43,6; −17,5] | −8,8 [−15,9; −2,3] | −20,2 [−34,4; −6,3] | −29,3 [−52,5; −6,6] | −11,7 [−29,4; 5,4] | 36 |
+| TRX | −1,0 [−12,7; 14,1] | −6,7 [−12,2; −1,7] | −15,9 [−27,1; −5,9] | −27,5 [−42,9; −13,6] | 2,7 [−7,1; 12,7] | 27 |
+| LINK | −18,6 [−30,1; −7,4] | −13,6 [−20,8; −6,4] | −23,0 [−36,9; −10,1] | −35,3 [−56,0; −14,8] | −0,4 [−16,5; 16,1] | 36 |
+| XLM | −13,0 [−23,9; −2,4] | −5,1 [−11,9; 1,6] | −9,3 [−23,1; 4,0] | −6,9 [−29,1; 14,4] | −6,8 [−23,1; 9,7] | 12 |
+| BCH | −20,9 [−32,1; −9,7] | −9,9 [−17,2; −3,4] | −12,3 [−24,5; −0,7] | −14,6 [−34,5; 2,5] | 3,6 [−11,4; 20,2] | 17 |
+| LTC | −16,2 [−27,1; −5,9] | −8,6 [−14,9; −2,8] | −10,0 [−21,7; 1,3] | −17,5 [−36,7; 0,2] | −1,1 [−16,1; 13,7] | 37 |
 
 Como ler:
 - **Há efeito, e ele se propaga.** Todas as moedas caem depois do anúncio, inclusive BTC e ETH, que quase nunca são
   a moeda do protocolo atacado. LINK, ADA e TRX caem mais; XLM quase não cai.
-- **Parte da queda vem antes da notícia** (CAR pré de −5 a −12 pb): o mercado já reage a sinais que aparecem antes
-  do anúncio oficial. Essa parte não dá para operar.
+- **Parte da queda vem antes da notícia** (CAR pré de −9 a −31 pb na meia hora antes do anúncio, exceto TRX, contra
+  quase zero no placebo): o mercado já reage a sinais que aparecem antes do anúncio oficial (alertas de empresas de
+  segurança, movimentações on-chain). Essa parte não dá para operar. A janela é [−30, 0]: com [−10, 0] a queda pré
+  era metade (−7 contra −14 pb na média das moedas), e com [−60, 0] o IC passava a cruzar o zero. Ela foi escolhida
+  olhando o treino, mas é só descritiva: não entra no backtest.
 - **A queda é lenta e pequena.** Leva cerca de 1 hora para chegar a −15 a −35 pb. A **meia-vida** (o minuto em que
   metade da queda posterior à venda já aconteceu) fica perto da vela +36 na maioria das moedas.
 - **O placebo fica perto de zero**, e em 6 das 10 moedas (BTC, ETH, TRX, LINK, BCH, LTC) a CR do ataque em +60 fica fora do IC do placebo.
