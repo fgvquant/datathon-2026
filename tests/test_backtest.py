@@ -25,11 +25,12 @@ def test_premio_e_teto_de_liquidez():
     close = np.full((1, 361), 100.0)
     close[0, POS + 10:] = 99.0                         # recompra 1% mais barato
     vol = np.full((1, 361), 1e9)
-    pi, f = premio(close, vol, np.array([1.0]), np.array([True]), 1, np.array([20]), 0.001, 1e6, 0.1)
-    assert np.isclose(pi, 0.01 - 0.002) and f[0] == 1  # 1% − 2 × 0,10%
+    c = np.full((1, 361), 0.001)
+    r = premio(close, vol, np.array([1.0]), np.array([True]), 1, np.array([20]), c[:, 0], c, 1e6, 0.1)
+    assert np.isclose(r["contrib"].sum(), 0.01 - 0.002) and r["f"][0] == 1  # 1% − 2 × 0,10%
     vol[:] = 5e6                                       # 10% do volume = US$ 500 mil: metade da carteira
-    pi, f = premio(close, vol, np.array([1.0]), np.array([True]), 1, np.array([20]), 0.001, 1e6, 0.1)
-    assert np.isclose(f[0], 0.5) and np.isclose(pi, 0.5 * 0.008)
+    r = premio(close, vol, np.array([1.0]), np.array([True]), 1, np.array([20]), c[:, 0], c, 1e6, 0.1)
+    assert np.isclose(r["f"][0], 0.5) and np.isclose(r["contrib"].sum(), 0.5 * 0.008)
     assert np.isclose(metricas(np.array([1, -3, 1]) / 1e4, np.ones(3, bool))["drawdown_max_pb"], 3)
 
 
@@ -40,11 +41,11 @@ def test_backtest_nao_ve_o_proprio_ataque_nem_o_futuro():
     d = dict(close=close, vol=np.full_like(close, 1e9), close_pl=close.copy(), vol_pl=np.full_like(close, 1e9),
              car=calcula_car(close)["car"], g=np.array([1., 2, 3, 4, 5, 3]), w=np.full((6, 2), 0.5),
              eventos=pd.DataFrame({"event_id": [f"E{i}" for i in range(6)], "hora_referencia_utc": horas}),
-             moedas=["BTC", "ETH"])
+             moedas=["BTC", "ETH"], custos={"zero": (np.zeros_like(close), np.zeros_like(close))})
     cfg = {"amostra": {"inicio_teste": "2026-01-01", "excluir": []}, "janela": {"minutos_depois": 180},
            "modelo": {"minutos_seguidos": 3},
-           "backtest": {"fracao_volume": 0.1, "custos": {"zero": {"taxa_pb": 0, "spread_pb": 0, "impacto_pb": 0}}}}
-    decisao = lambda x: x.loc[x.modelo == "score", ["event_id", "vendidas"]].to_numpy().tolist()
+           "backtest": {"fracao_volume": 0.1}}
+    decisao = lambda x: x[0].loc[x[0].modelo == "score", ["event_id", "vendidas"]].to_numpy().tolist()
     for treino in ("fixo", "expansivo"):
         antes = decisao(bt.roda(d, cfg, 2, "vale", treino, 1e6, "zero"))
         d2 = {**d, "car": d["car"].copy()}
@@ -57,3 +58,12 @@ def test_backtest_nao_ve_o_proprio_ataque_nem_o_futuro():
     cr_maio = lambda dd, m: bt.curvas(dd["car"], dd["g"], m, 3.0)[0]
     m_exp = np.array([1, 1, 1, 1, 1, 0], bool)
     assert not np.allclose(cr_maio(d, m_exp), cr_maio(d3, m_exp))
+
+
+def test_le_corretagem_soma_taxa_e_corretagem(tmp_path):
+    ev = pd.DataFrame({"event_id": ["E1"]})
+    df = pd.DataFrame({"event_id": "E1", "moeda": "BTC", "minuto_relativo": range(-180, 181),
+                       "taxa_venda": 0.10, "taxa_recompra": 0.08, "corretagem": 0.02})    # em %
+    df.to_csv(tmp_path / "c.csv", index=False)
+    venda, rec = bt.le_corretagem(tmp_path / "c.csv", "pct", ev, ["BTC"])
+    assert np.allclose(venda, 0.0012) and np.allclose(rec, 0.0010) and venda.shape == (1, 1, 361)

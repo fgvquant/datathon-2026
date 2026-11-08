@@ -27,30 +27,36 @@ def decide(cr, h_venda, saida, seguidos, custo_ida_volta_pb):
     return ganho > custo_ida_volta_pb, h_rec
 
 
-def recompra_perfeita(close, h_venda, custo_lado):
-    """Previsão perfeita: recompra no menor fechamento depois da venda; só vende se ganha líquido de custo.
+def recompra_perfeita(close, h_venda, custo_venda, custo_rec):
+    """Previsão perfeita: sabendo todos os preços e custos da janela, recompra na vela de maior ganho líquido
+    depois da venda e só vende se esse ganho for positivo.
 
-    Entra: close [I, 361]; h_venda (índice); custo_lado (fração). Sai: vende [I], h_rec [I].
+    Entra: close [I, 361]; h_venda (índice); custo_venda [I] e custo_rec [I, 361] (fração por lado, por vela).
+    Sai: vende [I], h_rec [I].
     """
-    h_rec = h_venda + 1 + close[:, POS + h_venda + 1:].argmin(1)
-    i = np.arange(len(close))
-    return 1 - close[i, POS + h_rec] / close[:, POS + h_venda] > 2 * custo_lado, h_rec
+    depois = slice(POS + h_venda + 1, None)
+    liquido = 1 - close[:, depois] / close[:, [POS + h_venda]] - custo_venda[:, None] - custo_rec[:, depois]
+    h_rec = h_venda + 1 + liquido.argmax(1)
+    return liquido.max(1) > 0, h_rec
 
 
-def premio(close, vol, w, vende, h_venda, h_rec, custo_lado, carteira, fracao_volume):
-    """Prêmio π_e = Σ_{i vendidas} w_i f_i [(1 − P_rec / P_venda) − 2 custo], em fração da carteira.
+def premio(close, vol, w, vende, h_venda, h_rec, custo_venda, custo_rec, carteira, fracao_volume):
+    """Prêmio π_e = Σ_{i vendidas} w_i f_i [(1 − P_rec / P_venda) − custo_venda_i − custo_rec_i], fração da carteira.
 
     Entra: close, vol [I, 361]; w [I] (pesos do CCI10, somam 1); vende [I]; h_venda; h_rec [I];
-           custo_lado (fração por lado); carteira (US$); fracao_volume (máximo da ordem como fração do volume do minuto).
+           custo_venda [I] e custo_rec [I, 361] (fração por lado; o da recompra é lido na vela de recompra);
+           carteira (US$); fracao_volume (máximo da ordem como fração do volume do minuto).
     f_i = parte de w_i que cabe em fracao_volume do volume da vela de venda e da de recompra (1 = posição inteira).
-    Sai: π (escalar) e a fração executada f [I].
+    Sai: dict de arrays [I]: p_venda, p_rec, f, bruto (1 − P_rec/P_venda), custo (ida e volta), contrib
+         (contribuição de cada moeda ao prêmio; π_e = contrib.sum()).
     """
     i = np.arange(len(close))
     pv, pr = close[:, POS + h_venda], close[i, POS + h_rec]
     teto = fracao_volume * np.minimum(vol[:, POS + h_venda], vol[i, POS + h_rec])
     # ponytail: ordem executada em uma vela só; fatiar em várias velas aumenta f nas moedas pequenas
     f = np.minimum(1.0, teto / np.maximum(w * carteira, 1e-9))
-    return float((vende * w * f * ((1 - pr / pv) - 2 * custo_lado)).sum()), f
+    bruto, custo = 1 - pr / pv, custo_venda + custo_rec[i, POS + h_rec]
+    return dict(p_venda=pv, p_rec=pr, f=f, bruto=bruto, custo=custo, contrib=vende * w * f * (bruto - custo))
 
 
 def metricas(pi, operou):
