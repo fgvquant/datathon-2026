@@ -14,22 +14,23 @@ import pandas as pd
 T0 = -180  # primeira vela da janela
 
 
-def carrega_janelas(caminho):
+def carrega_janelas(caminho, coluna="close"):
     """Lê minuto_janela_ataques.csv(.gz) ou minuto_janela_placebo.csv.gz.
 
-    Sai: close [E, I, 361] (preço de fechamento), eventos (DataFrame com event_id e hora_referencia_utc, na ordem
+    coluna = "close" (padrão) ou outra coluna da base, ex. "quote_volume" (volume em USDT).
+    Sai: close [E, I, 361] (a coluna pedida), eventos (DataFrame com event_id e hora_referencia_utc, na ordem
     de close) e moedas (lista, na ordem de close). Falha se faltar vela ou se houver preço ≤ 0 ou duplicata.
     """
-    df = pd.read_csv(caminho, usecols=["event_id", "hora_referencia_utc", "moeda", "minuto_relativo", "close"])
+    df = pd.read_csv(caminho, usecols=["event_id", "hora_referencia_utc", "moeda", "minuto_relativo", coluna])
     if df.duplicated(["event_id", "moeda", "minuto_relativo"]).any():
         raise ValueError(f"{caminho}: linhas repetidas")
-    if (df.close <= 0).any():
+    if coluna == "close" and (df.close <= 0).any():
         raise ValueError(f"{caminho}: preço ≤ 0")
     eventos = df.drop_duplicates("event_id")[["event_id", "hora_referencia_utc"]].sort_values("event_id")
     eventos["hora_referencia_utc"] = pd.to_datetime(eventos.hora_referencia_utc)
     moedas = sorted(df.moeda.unique())
     grade = pd.MultiIndex.from_product([eventos.event_id, moedas, range(-180, 181)])
-    s = df.set_index(["event_id", "moeda", "minuto_relativo"]).close.reindex(grade)
+    s = df.set_index(["event_id", "moeda", "minuto_relativo"])[coluna].reindex(grade)
     if s.isna().any():
         raise ValueError(f"{caminho}: {s.isna().sum()} velas faltando")
     return s.to_numpy().reshape(len(eventos), len(moedas), 361), eventos.reset_index(drop=True), moedas
@@ -50,6 +51,37 @@ def calcula_car(close, normal=(-180, -61), pre=(-10, 0)):
     return {"mu": mu, "ar": ar,
             "car": np.cumsum(ar[..., j(1):], axis=-1),
             "car_pre": ar[..., j(pre[0]): j(pre[1]) + 1].sum(axis=-1)}
+
+
+def retorno_bruto(close, janelas=((-60, -11), (-10, 0))):
+    """Retorno bruto (sem μ) desde a vela 0 e movimentos pré-anúncio, para o modelo condicional.
+
+    Entra: close [E, I, 361]; janelas = faixas (vela inicial, vela final) do movimento pré-anúncio.
+    Sai:   y [E, I, 180] (pb, y[..., h] = 1e4 ln(P_{vela h+1} / P_{vela 0})) e
+           x [E, I, K] (pb, x[..., k] = 1e4 ln(P_fim / P_{inicio−1}), soma dos retornos das velas da faixa k).
+    Sem μ de propósito: com AR, preditor e drift descontam o mesmo μ e o erro dele cria correlação espúria
+    (aparece igual no placebo).
+    """
+    lp = 1e4 * np.log(close)
+    p = lambda vela: vela - T0
+    y = lp[..., p(1):] - lp[..., p(0), None]
+    x = np.stack([lp[..., p(fim)] - lp[..., p(ini - 1)] for ini, fim in janelas], axis=-1)
+    return y, x
+
+
+def regressao_condicional(y, g, x):
+    """MQO empilhado y_{e,i}(h) = a_i(h) + b(h)(g_e − ḡ) + Σ_k c_k(h)(x_{e,i,k} − x̄_{i,k}) + ε, por h.
+
+    Entra: y [E, I, H] (pb); g [E] (score 1–5); x [E, I, K] (pb, preditores por ataque e moeda).
+    Sai:   a [I, H] (pb, média de y por moeda = efeito do ataque médio), coef [1+K, H] (b em pb por ponto de score,
+           c_k em pb por pb) e zbar [I, 1+K] (médias usadas para centrar: ḡ e x̄_i).
+    Inclinações comuns às moedas; centrar por moeda equivale à dummy de moeda. Curva de um ataque novo com
+    z = [g, x_1..x_K] por moeda ([I, 1+K]): a + (z − zbar) @ coef.
+    """
+    z = np.concatenate([np.broadcast_to(g[:, None, None], (*x.shape[:2], 1)), x], axis=-1)
+    zbar, a = z.mean(0), y.mean(0)
+    coef = np.linalg.lstsq((z - zbar).reshape(-1, z.shape[-1]), (y - a).reshape(-1, y.shape[-1]), rcond=None)[0]
+    return a, coef, zbar
 
 
 def pesos_bootstrap(n, replicas, seed):

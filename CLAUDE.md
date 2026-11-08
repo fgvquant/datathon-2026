@@ -33,8 +33,7 @@ config/       parâmetros em YAML (janela do retorno normal, latência, custos..
 src/          funções reutilizáveis (pacote Python)
 scripts/      scripts curtos que chamam src/ e salvam em results/
 notebooks/    exploração e gráficos; nenhuma lógica que outro arquivo precise
-tests/        pytest
-results/      saídas (fora do Git)
+results/      saídas (versionadas desde 08/11)
 docs/         links e notas
 ```
 
@@ -108,9 +107,9 @@ Modelo com score (H2):    CAR_{e,i}(h) = a_i(h) + b_i(h) (g_e − ḡ) + ε_{e,i
   moeda (quando cai). Robustez opcional: regressão do AR de cada moeda no AR defasado do BTC.
 - **Entrega do modelo base:** tabela por moeda com CAR_pre, CR nas velas **+1, +2, +5, +10, +15, +30, +60 e +180**,
   minuto do vale e meia-vida, cada um com IC, ao lado do placebo; e um gráfico da curva CR completa por moeda, com IC.
-- **Entrega do modelo com score:** principal = `b(h)` comum às moedas (item abaixo), curvas `CR(·; g)` para g = 1..5
-  (`score_comum_curvas.csv`, a que o backtest usa) e vale e meia-vida por score. Robustez/apêndice = `b_i(h)` por moeda
-  nas mesmas velas, com IC (`score_*`), para mostrar que o efeito do score não difere entre as moedas.
+- **Entrega do modelo com score:** `b(h)` comum às moedas (item abaixo, `score_comum_b.csv` e
+  `score_comum_teste.csv`). Saíram em 08/11: os `b_i(h)` por moeda, as curvas `CR(·; g)` e o vale e a meia-vida por
+  score; o backtest usa o modelo condicional (score + pré-anúncio, `condicional_coef.csv`).
 - **Teste de H2 (decidido em 08/11):** `b(h)` **comum às 10 moedas** (intercepto `a_i(h)` por moeda; com painel
   balanceado, é a média dos `b_i`), testado só nas velas `modelo.velas_teste_score` (+10, +30, +60). IC de 90% simples,
   sem Bonferroni; o relatório diz que são 3 testes. Robustez: o mesmo `b` comum por Huber (RLM empilhado, `huber_t`).
@@ -165,7 +164,7 @@ h_1/2  = min{ h ≥ h_e : CR(h; g) − CR(h_vale; g) ≤ 0,5 [CR(h_e; g) − CR(
   regra de saída e custos.
 - **Regra:** com `CR(·; g_e)` do treino, vender a moeda i se
   `−[CR_i(h_recompra; g_e) − CR_i(h_venda; g_e)] > custo de ida e volta`.
-- **Venda** na vela +2 (testar +1, +5, +10). **Recompra** no vale ou na meia-vida da moeda (config).
+- **Venda** na vela +2 (testar +1, +5, +10). **Recompra** na meia-vida da moeda (decidido em 08/11).
 - **Prêmio** de cada ataque e retorno da estratégia (pesos diários de `dados/cci10/cci10_pesos_diarios.csv`):
 
 ```
@@ -191,17 +190,15 @@ R_e(estratégia) = R_e(CCI10) + π_e
 
 ## 9. Convenções de código
 
-- Python 3.11, `pandas`, `numpy`, `statsmodels`, `pyyaml`, `pytest`; `anthropic` para o LLM.
+- Python 3.11, `pandas`, `numpy`, `statsmodels`, `pyyaml`; `anthropic` para o LLM.
 - Funções em `src/`, com docstring dizendo o que entra, o que sai e em que unidade (pb, %, minutos, velas).
 - Scripts em `scripts/` curtos, numerados na ordem do pipeline (`01_...`, `02_...`), lendo parâmetros de `config/`
   e salvando em `results/` com o nome da configuração usada.
 - Nomes em português, como no documento (`queda`, `vela`, `vale`, `meia_vida`, `premio`).
 - Seeds fixas em tudo que é aleatório (bootstrap, placebo, sorteios).
-- **Testes com dados simulados** em que a resposta é conhecida: por exemplo, plantar um ataque de −60 pb no BTC na
-  vela +1 e −5 pb/min de +2 a +10 e conferir que a CR recupera −105 pb em +10; plantar `b = −4` e conferir a
-  estimativa; conferir que o retorno normal usa só [−180, −61]; conferir que o backtest nunca vê ataques futuros.
+- Sem suíte de testes (removida em 08/11, decisão do grupo); as travas de look-ahead ficam como `assert` no código.
 - Fluxo Git: uma branch por tarefa (`modelo/`, `llm/`, `backtest/`, `dados/`), Pull Request revisado por outra
-  pessoa do grupo, testes verdes antes do merge.
+  pessoa do grupo.
 - **Mensagens de commit (obrigatório)** seguem o [gitmoji](https://gitmoji.dev), no formato
   `<emoji> comando: nome-do-commit`, com o emoji em código (`:sparkles:`), em minúsculas e em português. Exemplos:
   - `:sparkles: feat: calcula-car-por-ataque`
@@ -220,7 +217,7 @@ R_e(estratégia) = R_e(CCI10) + π_e
 - Antes de reportar números, rode as checagens de integridade da base (linhas por ataque e moeda, velas ausentes,
   duplicatas, preços ≤ 0, máxima < mínima, minuto 0 batendo com o horário do anúncio).
 - **Peça confirmação antes de chamadas pagas à API em lote**, dizendo quantas notícias e rodadas serão enviadas.
-- Não commite `.env`, `results/` ou arquivos acima de 50 MB.
+- Não commite `.env` ou arquivos acima de 50 MB.
 - Ao terminar uma tarefa, diga o que foi feito, como testar e o que ainda falta, em poucas linhas.
 
 ## 11. Decisões em aberto
@@ -235,6 +232,6 @@ R_e(estratégia) = R_e(CCI10) + π_e
 - [x] ~~Modelo principal~~ → event study com CAR; VAR-X com faixas vira robustez (07/11).
 - [x] ~~Janela de negociação~~ → ataques de 2026; treino = 2020–2025 (07/11).
 - [ ] Treino fixo (só 2020–2025) ou expansivo ao longo de 2026 no backtest.
-- [ ] Saída base: vale ou meia-vida.
+- [x] ~~Saída base: vale ou meia-vida~~ → só meia-vida; o vale fica descritivo no modelo (08/11).
 - [ ] Taxa spot da Binance em cada período.
 - [ ] Divisão do código: quem faz modelo e backtest (o LLM/score já tem dono).

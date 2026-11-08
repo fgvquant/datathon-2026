@@ -8,5 +8,4 @@ requests>=2.31
 anthropic
 python-dotenv
 matplotlib
-pytest>=8
 jupyterlab
