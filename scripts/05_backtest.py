@@ -153,30 +153,38 @@ def roda(d, cfg, vela_venda, saida, treino, carteira, custo):
 
 
 def grafico_vs_cci10(estr, cfg, arquivo, titulo):
-    """Nível do CCI10 parado e da estratégia com score (CCI10 × Π(1 + π_e)) em 2026, base 100, e a diferença em pb."""
-    nivel = pd.read_csv(RAIZ / "dados/cci10/cci10_nivel_diario.csv", parse_dates=["date"]).set_index("date").cci10
-    ini = pd.Timestamp(cfg["amostra"]["inicio_teste"])
-    nivel = nivel[nivel.index >= ini - pd.Timedelta(days=1)]
-    nivel = 100 * nivel / nivel.iloc[0]
-    fig, (ax, ax2) = plt.subplots(2, 1, figsize=(11, 6.5), sharex=True, gridspec_kw={"height_ratios": [2.2, 1]})
-    ax.plot(nivel.index, nivel, color="#898781", linewidth=2, label="CCI10 parado")
-    for (s, x), cor in zip(estr.groupby("saida", sort=False), ("#2a78d6", "#104281")):
-        fator = (1 + x.premio_pb.to_numpy() / 1e4).cumprod()
-        dia = x.hora_anuncio_utc.dt.normalize().to_numpy()
-        f_dia = pd.Series(fator, index=dia).groupby(level=0).last().reindex(nivel.index, method="ffill").fillna(1)
-        ax.plot(nivel.index, nivel * f_dia, color=cor, linewidth=1.6, label=f"Estratégia com score (recompra: {s})")
-        ax2.plot(nivel.index, 1e4 * (f_dia - 1), color=cor, linewidth=1.6, drawstyle="steps-post")
-    ax.set_ylabel("nível (base 100)")
-    ax2.set_ylabel("estratégia − CCI10 (pb)")
-    ax2.axhline(0, color="#898781", linewidth=1)
-    ax.legend(frameon=False, fontsize=9)
-    for a in (ax, ax2):
-        a.grid(color="#e1e0d9", linewidth=0.6)
-        for lado in ("top", "right"):
-            a.spines[lado].set_visible(False)
-    fig.suptitle(titulo, x=0.01, ha="left", fontsize=12)
+    """Retorno da estratégia com score acima do CCI10 parado, acumulado em 2026 (pb).
+
+    O CCI10 parado é a linha do zero: estratégia = CCI10 × Π(1 + π_e), logo estratégia / CCI10 − 1 = Π(1 + π_e) − 1,
+    que é premio_acumulado_pb. Plotar os dois níveis esconde a diferença (pb contra um índice que oscila dezenas de %).
+    Um ponto por ataque: cheio se vendeu alguma moeda, vazado se ficou parado.
+    """
+    x = estr[estr.saida == estr.saida.iloc[0]]
+    t, y = x.hora_anuncio_utc, x.premio_acumulado_pb.to_numpy()
+    op = x.n_vendidas.to_numpy() > 0
+    ini, azul, fundo = pd.Timestamp(cfg["amostra"]["inicio_teste"]), CORES["score"], "#fcfcfb"
+    fig, ax = plt.subplots(figsize=(11, 4.8))
+    ax.axhline(0, color="#898781", linewidth=1.5)
+    ax.annotate("CCI10 parado", (1, 0), xycoords=("axes fraction", "data"), xytext=(-4, 5), textcoords="offset points",
+                ha="right", color="#5f5e5a", fontsize=9)
+    ax.step(np.r_[ini, t], np.r_[0, y], where="post", color=azul, linewidth=2)
+    ax.scatter(t[op], y[op], s=40, color=azul, edgecolor=fundo, linewidth=0.8, zorder=3, label="vendeu alguma moeda")
+    ax.scatter(t[~op], y[~op], s=40, facecolor=fundo, edgecolor=azul, linewidth=1.5, zorder=3, label="ficou parado")
+    ax.annotate(f"{y[-1]:+.2f} pb", (t.iloc[-1], y[-1]), xytext=(8, 0), textcoords="offset points", va="center",
+                fontsize=10, color="#1f1f1e")
+    lim = 1.3 * max(np.abs(y).max(), 0.5)
+    ax.set_ylim(-lim, lim)
+    ax.set_ylabel("estratégia − CCI10, acumulado (pb; 1 pb = 0,01%)", color="#5f5e5a", fontsize=9)
+    ax.legend(frameon=False, fontsize=9, loc="upper left")
+    ax.grid(color="#e1e0d9", linewidth=0.6)
+    ax.tick_params(colors="#5f5e5a", labelsize=9)
+    for lado in ("top", "right"):
+        ax.spines[lado].set_visible(False)
+    for lado in ("left", "bottom"):
+        ax.spines[lado].set_color("#e1e0d9")
+    fig.suptitle(titulo, x=0.01, ha="left", fontsize=12, color="#1f1f1e")
     fig.tight_layout()
-    fig.savefig(arquivo, dpi=150, facecolor="#fcfcfb")
+    fig.savefig(arquivo, dpi=150, facecolor=fundo)
     plt.close(fig)
 
 
@@ -246,8 +254,9 @@ def main(argv=None):
           .last().to_string(float_format=lambda v: f"{v:9.2f}"))
 
     grafico_vs_cci10(estr, cfg, saida / "backtest_vs_cci10.png",
-                     f"Estratégia com score × CCI10 parado, 2026: venda na vela +{p['vela_venda']}, treino {p['treino']}, "
-                     f"US$ {p['carteira_usd']:,.0f}, custo {p['custo']}")
+                     f"Estratégia com score contra o CCI10 parado, 2026 ({len(estr.event_id.unique())} ataques)\n"
+                     f"venda na vela +{p['vela_venda']}, recompra na {estr.saida.iloc[0].replace('_', '-')}, "
+                     f"treino {p['treino']}, US$ {p['carteira_usd']:,.0f}, custo {p['custo']}")
 
     fig, eixos = plt.subplots(1, len(bt["saidas"]), figsize=(12, 4.5), sharey=True, squeeze=False)
     for ax, s in zip(eixos[0], bt["saidas"]):
