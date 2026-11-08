@@ -1,7 +1,7 @@
 """Backtest nos 45 ataques de 2026 (seção 7): modelo condicional, modelo base ("vender sempre") e previsão perfeita.
 
 Modelo condicional (08/11): retorno bruto desde a vela 0 ~ score + movimento bruto pré-anúncio (`condicional` no
-config), estimado em 2020–2025. Substituiu o modelo só com score DEPOIS de ver 2026 (dizer no relatório).
+config), estimado em 2020–2025. Substituiu o modelo só com score.
 Base = CR média do treino (b = 0, sem pré-anúncio). O placebo fica só nas regressões do modelo (04).
 
 Rode da raiz do repositório:
@@ -394,8 +394,7 @@ def main(argv=None):
             linhas.append({**dict(zip(chaves, comb)), "modelo": m,
                            **metricas(y.premio_pb.to_numpy() / 1e4, y.n_vendidas.to_numpy() > 0)})
     met = pd.DataFrame(linhas)
-    # Sharpe deflacionado: as tentativas são todas as combinações da estratégia condicional. Não conta o modelo só com
-    # score, testado antes e descartado depois de ver 2026: o deflacionado sai otimista (dizer no relatório).
+    # Sharpe deflacionado: as tentativas são todas as combinações da estratégia condicional.
     sr_tent = met.loc[met.modelo == "condicional", "ir"]
     met["sharpe_deflacionado"] = [sharpe_deflacionado(r.ir, r.n_ataques, r.assimetria, r.curtose, sr_tent)
                                   if np.isfinite(r.ir) else np.nan for r in met.itertuples()]

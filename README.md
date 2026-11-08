@@ -20,25 +20,26 @@ estratégia de vender e recomprar só ganha do CCI10 parado por causa de dois at
 Quando um protocolo cripto anuncia que sofreu um ataque (hack, exploit, roubo de fundos), o mercado como um todo
 reage? E, se reage, dá para lucrar com isso? Testamos três hipóteses:
 
-| Hipótese | Pergunta | Resposta |
-| --- | --- | --- |
-| **H1 — Efeito** | O ataque gera uma queda mensurável, e ela se propaga entre as moedas? | **Sim.** Queda de −7 a −35 pb até a vela +60 em todas as moedas; em 6 das 10, fora do IC do placebo. |
-| **H2 — Ganho do LLM** | Ler a notícia com um LLM (score de gravidade de 1 a 5) melhora a previsão? | **Não.** O coeficiente do score não é diferente de zero em nenhuma das 3 velas testadas. |
-| **H3 — Look-ahead** | O LLM acerta porque reconhece o ataque, e não porque entende a notícia? | Sem resultado neste repositório; como o score não ajuda (H2), não há acerto a explicar. |
+| Hipótese              | Pergunta                                                                   | Resposta                                                                                             |
+| --------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **H1 — Efeito**       | O ataque gera uma queda mensurável, e ela se propaga entre as moedas?      | **Sim.** Queda de −7 a −35 pb até a vela +60 em todas as moedas; em 6 das 10, fora do IC do placebo. |
+| **H2 — Ganho do LLM** | Ler a notícia com um LLM (score de gravidade de 1 a 5) melhora a previsão? | **Não.** O coeficiente do score não é diferente de zero em nenhuma das 3 velas testadas.             |
+| **H3 — Look-ahead**   | O LLM acerta porque reconhece o ataque, e não porque entende a notícia?    | Sem resultado neste repositório; como o score não ajuda (H2), não há acerto a explicar.              |
 
 ## 2. Os dados
 
-| Base | O que é | Onde |
-| --- | --- | --- |
-| Eventos | 196 ataques de 2020 a 2026 com o horário (UTC, ao segundo) do **primeiro anúncio** no X, conferido à mão. | `dados/eventos/coleta_tweets_ataques.xlsx` |
-| Preços | Velas de 1 minuto da Binance spot (par USDT) das 10 moedas do CCI10, de 3 h antes a 3 h depois de cada anúncio, com o volume em USDT e a taxa de corretagem por lado. | `dados/precos/minuto_janela_ataques.csv.gz` |
-| Placebo | As mesmas janelas, na mesma hora, 1 semana antes do ataque (2 a 4 semanas se cruzar outro ataque). | `dados/placebo/minuto_janela_placebo.csv.gz` |
-| CCI10 | Nível diário e pesos do índice (as 10 maiores moedas por valor de mercado). | `dados/cci10/` |
-| Score do LLM | Gravidade de 1 a 5 de cada ataque, lida só do texto do primeiro anúncio. | `dados/llm/scores.csv` |
+| Base         | O que é                                                                                                                                                               | Onde                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Eventos      | 196 ataques de 2020 a 2026 com o horário (UTC, ao segundo) do **primeiro anúncio** no X, conferido à mão.                                                             | `dados/eventos/coleta_tweets_ataques.xlsx`   |
+| Preços       | Velas de 1 minuto da Binance spot (par USDT) das 10 moedas do CCI10, de 3 h antes a 3 h depois de cada anúncio, com o volume em USDT e a taxa de corretagem por lado. | `dados/precos/minuto_janela_ataques.csv.gz`  |
+| Placebo      | As mesmas janelas, na mesma hora, 1 semana antes do ataque (2 a 4 semanas se cruzar outro ataque).                                                                    | `dados/placebo/minuto_janela_placebo.csv.gz` |
+| CCI10        | Nível diário e pesos do índice (as 10 maiores moedas por valor de mercado).                                                                                           | `dados/cci10/`                               |
+| Score do LLM | Gravidade de 1 a 5 de cada ataque, lida só do texto do primeiro anúncio.                                                                                              | `dados/llm/scores.csv`                       |
 
 As 10 moedas: BTC, ETH, BNB, XRP, ADA, TRX, LINK, XLM, BCH e LTC.
 
 **Divisão da amostra (fixada antes de olhar 2026):**
+
 - **Estimação:** 151 ataques de 2020 a 2025. É só daqui que saem os parâmetros do modelo.
 - **Negociação (backtest):** 45 ataques de 2026. Nenhum preço de 2026 entra na estimação.
 
@@ -48,7 +49,7 @@ primeiro minuto inteiro depois da notícia. Se o tweet saiu às 14:03:27, a vela
 
 ## 3. O modelo: event study intradiário
 
-Seguimos o *event study* clássico (MacKinlay, 1997), mas minuto a minuto.
+Seguimos o _event study_ clássico (MacKinlay, 1997), mas minuto a minuto.
 
 1. **Retorno normal** de cada moeda em cada ataque: a média do retorno por minuto entre as velas −180 e −61. A
    janela termina 1 hora antes do anúncio porque a queda costuma começar antes da notícia oficial (vazamento,
@@ -66,20 +67,21 @@ Seguimos o *event study* clássico (MacKinlay, 1997), mas minuto a minuto.
 CR em pb, 151 ataques de 2020–2025, IC de 90% entre colchetes
 (`results/parametros/modelo/tabelas/base_tabela.csv`, gráfico em `graficos/base_curvas.png`):
 
-| Moeda | CAR pré (−30 a 0) | CR +10 | CR +30 | CR +60 | CR +60 placebo | Meia-vida (vela) |
-| --- | --- | --- | --- | --- | --- | --- |
-| BTC | −8,6 [−15,9; −1,1] | −4,5 [−8,2; −1,0] | −10,7 [−20,4; −2,0] | −14,9 [−25,0; −5,3] | −4,6 [−13,4; 3,9] | 35 |
-| ETH | −11,3 [−21,9; −1,2] | −6,6 [−11,7; −2,3] | −12,4 [−23,6; −2,4] | −23,8 [−41,2; −8,7] | −3,3 [−14,7; 8,4] | 36 |
-| BNB | −8,9 [−19,4; 1,2] | −6,1 [−13,3; 0,2] | −10,8 [−23,3; 1,3] | −21,5 [−43,5; −2,7] | −10,2 [−22,3; 1,4] | 39 |
-| XRP | −14,2 [−25,6; −3,2] | −11,5 [−19,6; −3,8] | −14,8 [−30,0; −0,7] | −22,1 [−47,2; 0,3] | −10,6 [−28,8; 7,2] | 36 |
-| ADA | −30,5 [−43,6; −17,5] | −8,8 [−15,9; −2,3] | −20,2 [−34,4; −6,3] | −29,3 [−52,5; −6,6] | −11,7 [−29,4; 5,4] | 36 |
-| TRX | −1,0 [−12,7; 14,1] | −6,7 [−12,2; −1,7] | −15,9 [−27,1; −5,9] | −27,5 [−42,9; −13,6] | 2,7 [−7,1; 12,7] | 27 |
-| LINK | −18,6 [−30,1; −7,4] | −13,6 [−20,8; −6,4] | −23,0 [−36,9; −10,1] | −35,3 [−56,0; −14,8] | −0,4 [−16,5; 16,1] | 36 |
-| XLM | −13,0 [−23,9; −2,4] | −5,1 [−11,9; 1,6] | −9,3 [−23,1; 4,0] | −6,9 [−29,1; 14,4] | −6,8 [−23,1; 9,7] | 12 |
-| BCH | −20,9 [−32,1; −9,7] | −9,9 [−17,2; −3,4] | −12,3 [−24,5; −0,7] | −14,6 [−34,5; 2,5] | 3,6 [−11,4; 20,2] | 17 |
-| LTC | −16,2 [−27,1; −5,9] | −8,6 [−14,9; −2,8] | −10,0 [−21,7; 1,3] | −17,5 [−36,7; 0,2] | −1,1 [−16,1; 13,7] | 37 |
+| Moeda | CAR pré (−30 a 0)    | CR +10              | CR +30               | CR +60               | CR +60 placebo     | Meia-vida (vela) |
+| ----- | -------------------- | ------------------- | -------------------- | -------------------- | ------------------ | ---------------- |
+| BTC   | −8,6 [−15,9; −1,1]   | −4,5 [−8,2; −1,0]   | −10,7 [−20,4; −2,0]  | −14,9 [−25,0; −5,3]  | −4,6 [−13,4; 3,9]  | 35               |
+| ETH   | −11,3 [−21,9; −1,2]  | −6,6 [−11,7; −2,3]  | −12,4 [−23,6; −2,4]  | −23,8 [−41,2; −8,7]  | −3,3 [−14,7; 8,4]  | 36               |
+| BNB   | −8,9 [−19,4; 1,2]    | −6,1 [−13,3; 0,2]   | −10,8 [−23,3; 1,3]   | −21,5 [−43,5; −2,7]  | −10,2 [−22,3; 1,4] | 39               |
+| XRP   | −14,2 [−25,6; −3,2]  | −11,5 [−19,6; −3,8] | −14,8 [−30,0; −0,7]  | −22,1 [−47,2; 0,3]   | −10,6 [−28,8; 7,2] | 36               |
+| ADA   | −30,5 [−43,6; −17,5] | −8,8 [−15,9; −2,3]  | −20,2 [−34,4; −6,3]  | −29,3 [−52,5; −6,6]  | −11,7 [−29,4; 5,4] | 36               |
+| TRX   | −1,0 [−12,7; 14,1]   | −6,7 [−12,2; −1,7]  | −15,9 [−27,1; −5,9]  | −27,5 [−42,9; −13,6] | 2,7 [−7,1; 12,7]   | 27               |
+| LINK  | −18,6 [−30,1; −7,4]  | −13,6 [−20,8; −6,4] | −23,0 [−36,9; −10,1] | −35,3 [−56,0; −14,8] | −0,4 [−16,5; 16,1] | 36               |
+| XLM   | −13,0 [−23,9; −2,4]  | −5,1 [−11,9; 1,6]   | −9,3 [−23,1; 4,0]    | −6,9 [−29,1; 14,4]   | −6,8 [−23,1; 9,7]  | 12               |
+| BCH   | −20,9 [−32,1; −9,7]  | −9,9 [−17,2; −3,4]  | −12,3 [−24,5; −0,7]  | −14,6 [−34,5; 2,5]   | 3,6 [−11,4; 20,2]  | 17               |
+| LTC   | −16,2 [−27,1; −5,9]  | −8,6 [−14,9; −2,8]  | −10,0 [−21,7; 1,3]   | −17,5 [−36,7; 0,2]   | −1,1 [−16,1; 13,7] | 37               |
 
 Como ler:
+
 - **Há efeito, e ele se propaga.** Todas as moedas caem depois do anúncio, inclusive BTC e ETH, que quase nunca são
   a moeda do protocolo atacado. LINK, ADA e TRX caem mais; XLM quase não cai.
 - **Parte da queda vem antes da notícia** (CAR pré de −9 a −31 pb na meia hora antes do anúncio, exceto TRX, contra
@@ -105,11 +107,11 @@ Distribuição dos 196 scores: 1 → 14, 2 → 91, 3 → 65, 4 → 25, 5 → 1.
 deve ser negativo (ataque mais grave → queda maior). Testamos só nas velas +10, +30 e +60, fixadas antes de rodar,
 por MQO e, como robustez, por regressão de Huber (menos sensível a ataques extremos).
 
-| Vela | b MQO (pb por ponto de score) | IC 90% | b Huber | IC 90% |
-| --- | --- | --- | --- | --- |
-| +10 | +3,3 | [−3,7; 11,2] | +0,5 | [−3,1; 3,9] |
-| +30 | −2,8 | [−17,4; 11,4] | −0,7 | [−7,5; 6,3] |
-| +60 | +5,1 | [−21,8; 35,8] | −1,2 | [−13,7; 11,0] |
+| Vela | b MQO (pb por ponto de score) | IC 90%        | b Huber | IC 90%        |
+| ---- | ----------------------------- | ------------- | ------- | ------------- |
+| +10  | +3,3                          | [−3,7; 11,2]  | +0,5    | [−3,1; 3,9]   |
+| +30  | −2,8                          | [−17,4; 11,4] | −0,7    | [−7,5; 6,3]   |
+| +60  | +5,1                          | [−21,8; 35,8] | −1,2    | [−13,7; 11,0] |
 
 **Nenhum b é diferente de zero**, e o sinal muda de uma vela para outra. O score do LLM não ajuda a prever o tamanho
 da queda. (`results/parametros/modelo/tabelas/score_comum_teste.csv`)
@@ -155,12 +157,16 @@ Para cada ataque de 2026 e cada moeda:
    O retorno da estratégia é o do CCI10 parado mais π_e.
 
 **Custos e liquidez:**
-- Corretagem de **0,10% por lado** (20 pb na ida e volta), lida da base de preços.
+
+- Corretagem de **0,10% por lado** (20 pb na ida e volta), lida da base de preços. É a taxa padrão spot da Binance
+  para uma conta comum (VIP 0), gravada pelo 01 a partir de `corretagem.taxa_spot_por_lado` no config. Pagando a taxa
+  em BNB, cairia para 0,075% por lado; usar 0,10% é conservador.
 - Cada ordem fica limitada a **10% do volume em USDT do minuto** (na vela de venda e na de recompra). Com uma carteira
   de US$ 1 milhão, isso limita muito as moedas pequenas: em média só **7,8%** da posição de cada trade foi executada.
 - Pesos do CCI10 do dia anterior ao ataque.
 
 **Comparações:**
+
 - **CCI10 parado** (a linha do zero).
 - **"Vender sempre"** (modelo base): a mesma regra com a CR média do treino, sem score nem pré-anúncio.
 - **Previsão perfeita:** sabendo todos os preços, recompra no melhor minuto. É o teto do que dá para ganhar.
@@ -180,16 +186,17 @@ Combinação principal: venda na vela +2, recompra na meia-vida, treino fixo (20
 corretagem de 0,10% por lado. 45 ataques de 2026.
 (`results/parametros/backtest/tabelas/metricas.csv`)
 
-| Estratégia | Ataques operados | Prêmio médio por ataque | Prêmio acumulado | Taxa de acerto | t | Drawdown máx. | Sharpe deflacionado |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Condicional | 34 | +1,23 pb | **+55,5 pb** | 15% | 0,87 | 25,8 pb | 0,38 |
-| Vender sempre (base) | 45 | −0,02 pb | −1,0 pb | 31% | −0,52 | 2,6 pb | 0,04 |
-| Previsão perfeita | 44 | +10,5 pb | +470,7 pb | 100% | 3,10 | 0 | 1,00 |
+| Estratégia           | Ataques operados | Prêmio médio por ataque | Prêmio acumulado | Taxa de acerto | t     | Drawdown máx. | Sharpe deflacionado |
+| -------------------- | ---------------- | ----------------------- | ---------------- | -------------- | ----- | ------------- | ------------------- |
+| Condicional          | 34               | +1,23 pb                | **+55,5 pb**     | 15%            | 0,87  | 25,8 pb       | 0,38                |
+| Vender sempre (base) | 45               | −0,02 pb                | −1,0 pb          | 31%            | −0,52 | 2,6 pb        | 0,04                |
+| Previsão perfeita    | 44               | +10,5 pb                | +470,7 pb        | 100%           | 3,10  | 0             | 1,00                |
 
 Taxa de acerto = fração dos ataques operados com prêmio positivo. Sharpe deflacionado (Bailey e López de Prado, 2014)
 = probabilidade de o Sharpe verdadeiro superar o melhor esperado por sorte entre as 72 combinações testadas.
 
 **Os trades** (155 vendas em 34 ataques; `results/parametros/backtest/tabelas/trades.csv`):
+
 - Queda esperada média de 28,5 pb; queda realizada média de 11,2 pb. O modelo esperava o dobro da queda que veio.
 - O preço caiu entre a venda e a recompra em 50% dos trades. Descontado o custo, só 29% dos trades ganharam.
 
@@ -199,13 +206,10 @@ Taxa de acerto = fração dos ataques operados com prêmio positivo. Sharpe defl
    **Sem os dois, o condicional fica em −25,4 pb**, abaixo do "vender sempre" (−2,4 pb). Só sem o E583 (que a
    especificação já mandava tirar na robustez), fica em +34,1 pb.
 2. **O t é 0,87**: o prêmio médio não é diferente de zero.
-3. **O modelo condicional foi escolhido depois de ver 2026.** Antes ele era só com o score. O modelo só com score dava
-   −8,9 pb na mesma combinação (−10,4 pb sem E473 e E583). O Sharpe deflacionado conta só as combinações do
-   condicional, então o 0,38 é otimista.
-4. **Varia muito com os parâmetros.** Nas 72 combinações, o prêmio do condicional vai de −49 pb a +157 pb. Com venda
+3. **Varia muito com os parâmetros.** Nas 72 combinações, o prêmio do condicional vai de −49 pb a +157 pb. Com venda
    na vela +10, fica entre −49 e +38 pb; com carteira de US$ 10 milhões, nunca passa de +17 pb (a liquidez não deixa
    executar).
-5. **O teto é baixo.** Mesmo com previsão perfeita, o ganho é de +471 pb em 45 ataques (≈ 10 pb por ataque), e é
+4. **O teto é baixo.** Mesmo com previsão perfeita, o ganho é de +471 pb em 45 ataques (≈ 10 pb por ataque), e é
    isso que um modelo realista precisaria capturar descontando o ruído.
 
 ### Conclusão
@@ -217,16 +221,16 @@ mercado**: a informação do anúncio é incorporada aos preços rápido o basta
 
 ## 7. Gráficos
 
-| Arquivo | O que mostra |
-| --- | --- |
-| `results/parametros/modelo/graficos/base_curvas.png` | CR por moeda, ataque × placebo, com IC |
-| `results/parametros/modelo/graficos/condicional_coef.png` | Coeficientes do modelo condicional por minuto, ataque × placebo |
-| `results/parametros/backtest/graficos/estrategia_vs_cci10.png` | Estratégia menos CCI10 parado, acumulado em 2026 (pb) |
-| `results/parametros/backtest/graficos/estrategia_retorno.png` | Nível da estratégia em 2026 (base 100) |
-| `results/parametros/backtest/graficos/modelos_acumulado.png` | Prêmio acumulado: condicional, vender sempre e previsão perfeita |
-| `results/parametros/backtest/graficos/trades_esperado_vs_realizado.png` | Esperado × realizado nos 3 melhores e 3 piores trades |
-| `results/parametros/backtest/graficos/media_esperado_vs_realizado.png` | Esperado × realizado em média, por moeda, em 2026 |
-| `results/parametros/backtest/graficos/cci10_periodo.png` | CCI10 de 2020 a 2026, com os períodos de estimação e negociação |
+| Arquivo                                                                 | O que mostra                                                     |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `results/parametros/modelo/graficos/base_curvas.png`                    | CR por moeda, ataque × placebo, com IC                           |
+| `results/parametros/modelo/graficos/condicional_coef.png`               | Coeficientes do modelo condicional por minuto, ataque × placebo  |
+| `results/parametros/backtest/graficos/estrategia_vs_cci10.png`          | Estratégia menos CCI10 parado, acumulado em 2026 (pb)            |
+| `results/parametros/backtest/graficos/estrategia_retorno.png`           | Nível da estratégia em 2026 (base 100)                           |
+| `results/parametros/backtest/graficos/modelos_acumulado.png`            | Prêmio acumulado: condicional, vender sempre e previsão perfeita |
+| `results/parametros/backtest/graficos/trades_esperado_vs_realizado.png` | Esperado × realizado nos 3 melhores e 3 piores trades            |
+| `results/parametros/backtest/graficos/media_esperado_vs_realizado.png`  | Esperado × realizado em média, por moeda, em 2026                |
+| `results/parametros/backtest/graficos/cci10_periodo.png`                | CCI10 de 2020 a 2026, com os períodos de estimação e negociação  |
 
 ## 8. Como rodar
 
@@ -238,14 +242,14 @@ pip install -r requirements.txt
 cp .env.example .env                                  # e coloque a chave da API do LLM (só para o 03)
 ```
 
-| Script | O que faz | Precisa rodar? |
-| --- | --- | --- |
-| `scripts/00_cci10.py` | Monta o CCI10 diário e os pesos a partir dos CSVs do CoinMarketCap | Já está em `dados/cci10/` |
-| `scripts/01_baixa_janelas_ataques.py` | Baixa as velas de 1 min da Binance em torno de cada ataque | Já está em `dados/precos/` |
-| `scripts/02_baixa_placebo.py` | Baixa as janelas placebo | Já está em `dados/placebo/` |
-| `scripts/03_score_llm.py` | Gera o score do LLM (chamadas pagas à API) | Já está em `dados/llm/scores.csv` |
-| `scripts/04_modelo.py` | Event study, teste de H2 e modelo condicional, com placebo | Sim (alguns minutos) |
-| `scripts/05_backtest.py` | Backtest nas 72 combinações, métricas, trades e gráficos | Sim (~1 min) |
+| Script                                | O que faz                                                          | Precisa rodar?                    |
+| ------------------------------------- | ------------------------------------------------------------------ | --------------------------------- |
+| `scripts/00_cci10.py`                 | Monta o CCI10 diário e os pesos a partir dos CSVs do CoinMarketCap | Já está em `dados/cci10/`         |
+| `scripts/01_baixa_janelas_ataques.py` | Baixa as velas de 1 min da Binance em torno de cada ataque e grava a corretagem (`corretagem.taxa_spot_por_lado` no config) em cada vela | Já está em `dados/precos/` |
+| `scripts/02_baixa_placebo.py`         | Baixa as janelas placebo                                           | Já está em `dados/placebo/`       |
+| `scripts/03_score_llm.py`             | Gera o score do LLM (chamadas pagas à API)                         | Já está em `dados/llm/scores.csv` |
+| `scripts/04_modelo.py`                | Event study, teste de H2 e modelo condicional, com placebo         | Sim (alguns minutos)              |
+| `scripts/05_backtest.py`              | Backtest nas 72 combinações, métricas, trades e gráficos           | Sim (~1 min)                      |
 
 ```bash
 python scripts/04_modelo.py
