@@ -246,7 +246,7 @@ Leitura:
 Branch `modelo/janela-normal-e-placebo`, commitada e **ainda sem push nem PR** (já traz a main com os arquivos do LLM).
 
 **Feito**
-- Placebo A baixado (`dados/placebo/minuto_janela_placebo.csv.gz`): 197 janelas, 191 a 1 semana e 6 a 2 semanas
+- Placebo A baixado (`dados/placebo/minuto_janela_placebo.csv.gz`): 196 janelas, 190 a 1 semana e 6 a 2 semanas
   antes (E068, E107, E154, E331, E410, E561, que cruzavam outro ataque). Integridade conferida.
 - Retorno normal passou a [−180, −61] (vazamento antes do anúncio contaminava o μ).
 - Event study completo em `src/modelo.py` + `scripts/04_modelo.py`: CAR, CR por moeda, bootstrap por ataque, vale,
@@ -267,7 +267,7 @@ Branch `modelo/janela-normal-e-placebo`, commitada e **ainda sem push nem PR** (
 
 **Próximos passos**
 1. Push e PR da branch para revisão.
-2. Grupo decidir: rodadas do LLM (1 hoje; especificação pede 3 a 5 → mais 394 a 788 chamadas pagas) e saída base
+2. Grupo decidir a saída base
    (vale ou meia-vida).
 3. Backtest (seção 7 do CLAUDE.md), ainda não começado.
 4. Robustezes do modelo (lista abaixo), cada uma como um YAML em `config/` passado com `--config`.
@@ -276,10 +276,10 @@ Branch `modelo/janela-normal-e-placebo`, commitada e **ainda sem push nem PR** (
 
 | Ponto | Padrão hoje |
 | --- | --- |
-| E519 ou E524 (mesmo incidente) | fica o E524 |
+| E519 ou E524 (mesmo incidente) | fica o E524; o E519 saiu da base dos colegas em 07/11 |
 | 8 horários suspeitos e 3 possíveis não-ataques | ficam na amostra, só sinalizados |
 | Leitura dos "3 minutos seguidos" no vale | início do bloco de 3 minutos com o fundo mais baixo; meia-vida = 1º bloco de 3 minutos todo abaixo da metade da queda; sem queda depois da venda, vale = meia-vida = vela de venda |
-| Rodadas do LLM | 1 (é o que foi rodado em 07/11); a especificação pede 3 a 5 |
+| Rodadas do LLM | 1 por notícia (decidido pelo grupo em 07/11; a especificação pedia 3 a 5) |
 | Saída base: vale ou meia-vida | os dois são calculados; a meia-vida é mais estável |
 | Modelo principal | event study com CAR; VAR-X com faixas só como robustez (decidido em 07/11) |
 | Janela do retorno normal | −180 a −61 (decidido em 07/11; congelada antes do backtest) |
@@ -287,7 +287,7 @@ Branch `modelo/janela-normal-e-placebo`, commitada e **ainda sem push nem PR** (
 
 ## Dados
 
-- [x] **Notas reais do LLM** (`dados/llm/scores.csv`, 1 rodada; falta decidir se rodam 3 a 5).
+- [x] **Notas reais do LLM** (`dados/llm/scores.csv`, 196 ataques, 1 rodada por decisão do grupo).
 - [x] **Janelas placebo** (mesmo formato dos ataques, 7 dias antes): `scripts/02_baixa_placebo.py`.
 
 ## Modelo

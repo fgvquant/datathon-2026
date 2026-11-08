@@ -1,5 +1,5 @@
 """
-Dá um score de 1 a 5 para o primeiro anúncio de cada um dos 197 ataques, usando um LLM.
+Dá um score de 1 a 5 para o primeiro anúncio de cada um dos 196 ataques, usando um LLM. Decisão do grupo (07/11): 1 rodada por notícia.
 
 Entradas:
   dados/eventos/coleta_tweets_ataques.xlsx  texto_original de cada ataque
@@ -12,21 +12,21 @@ Saídas:
                               notas de cada rodada, amplitude, modelo e regua_sha. É o que o modelo lê.
 
 Regras:
-  - Entram os 197 ataques com notícia.
+  - Entram os 196 ataques com notícia.
   - O modelo recebe só a régua e o texto_original. Nenhuma outra coluna é enviada.
   - Nenhuma ferramenta é declarada, então o modelo não acessa a internet.
   - Cada notícia roda RODADAS vezes e o score é a mediana.
   - Uma notícia com alguma rodada sem nota fica com score vazio, para conferência.
   - Se parar no meio, é só rodar de novo: o que já foi respondido é pulado.
   - Sem chamadas pendentes, só regrava dados/llm/scores.csv a partir de respostas.jsonl (não precisa de API).
-  - --limite sorteia notícias só da calibração, para ajustar a régua sem olhar o teste. A rodada final dá score aos 197.
+  - --limite sorteia notícias só da calibração, para ajustar a régua sem olhar o teste. A rodada final dá score aos 196.
 
 Antes de rodar: pip install anthropic   e defina a variável de ambiente ANTHROPIC_API_KEY.
 
 Como rodar (na raiz do repositório):
   python scripts/03_score_llm.py --sem-api       mostra o que seria enviado, sem chamar nem pagar nada
   python scripts/03_score_llm.py --limite 10     testa com 10 notícias do período de calibração
-  python scripts/03_score_llm.py                 roda os 197
+  python scripts/03_score_llm.py                 roda os 196
 """
 import argparse, hashlib, json, os
 from datetime import datetime, timezone

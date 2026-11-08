@@ -24,7 +24,7 @@ de um argumento de eficiência de mercado, que também é um resultado válido.
 
 ```
 dados/
-  eventos/    coleta_tweets_ataques.xlsx — primeiro anúncio de cada ataque (os 197 com horário da v19)
+  eventos/    coleta_tweets_ataques.xlsx — primeiro anúncio de cada ataque (os 196 com horário da v19, sem o E519)
   precos/     minuto_janela_ataques.csv — velas de 1 min, ±3h em torno de cada anúncio
   placebo/    janelas sem ataque (mesmo horário, uma semana antes; 2–4 se cruzar outro ataque)
   cci10/      série diária e pesos do CCI10
@@ -48,9 +48,10 @@ O dicionário das bases está em `dados/README.md`.
   14:03:27, a vela 0 é a das 14:03 e a vela +1 é a das 14:04.
 - **Retorno** = log-retorno de 1 minuto em pontos-base, `1e4 * (ln P_t - ln P_{t-1})`, calculado **dentro** de cada
   janela. Nunca calcule retorno entre a última vela de um ataque e a primeira do seguinte.
-- **E519 e E524 são o mesmo incidente** (horários a 2 s de distância): use só um.
+- **E519 e E524 são o mesmo incidente** (horários a 2 s de distância): o E519 saiu da base em 07/11; fica o E524.
 - **Amostra principal:** ataques com `timestamp_utc` preenchido. Na v19 são 197 de 583 (188 "verificado no X" e
-  9 "achado, conferir se é o 1º"); 122 até 2024 e 75 em 2025–26.
+  9 "achado, conferir se é o 1º"); 122 até 2024 e 75 em 2025–26. Sem o E519, a base do repositório tem **196**
+  (187 "verificado no X").
 - **Treino e negociação (decidido pelo grupo):** a negociação são os **45 ataques de 2026**; o modelo é estimado só
   com os **151 de 2020–2025** (`amostra.inicio_teste` no config). Nenhum preço de 2026 entra na estimação.
 - **Saem só nos testes de robustez:** E583, rug pulls e anúncios não confirmados.
@@ -61,7 +62,7 @@ O dicionário das bases está em `dados/README.md`.
     E382 (post da Arkham).
   - 4 horários com segundos zerados (ex.: E257 às 20:20:00), que parecem digitados à mão.
   - 20 primeiros anúncios já mencionam reembolso ou desfecho (`menciona_desfecho = S`).
-- `minuto_janela_ataques.csv` cobre os 197 ataques da amostra principal (v19). As janelas placebo (Binance spot,
+- `minuto_janela_ataques.csv` cobre os 196 ataques da amostra principal (v19 sem o E519). As janelas placebo (Binance spot,
   velas de 1 min, `data.binance.vision`) saem de `scripts/02_baixa_placebo.py`, **no mesmo formato** mais a coluna
   `semanas_antes`.
 
@@ -142,11 +143,11 @@ h_1/2  = min{ h ≥ h_e : CR(h; g) − CR(h_vale; g) ≤ 0,5 [CR(h_e; g) − CR(
   confirmação antes de rodá-lo com chamadas pendentes). Régua em `dados/llm/regua_llm.txt` (sha `8371eaa5be9e`),
   respostas brutas em `dados/llm/respostas.jsonl`. O modelo só lê `dados/llm/scores.csv`, com as colunas
   `event_id`, `gravidade` (mediana das rodadas, inteiro 1–5) e `n_rodadas`.
-- Scores reais desde 07/11: 197 ataques, **1 rodada** por notícia (`llm.rodadas` no config), distribuição
-  1: 14, 2: 91, 3: 66, 4: 25, 5: 1. Se `scores.csv` sumir, o modelo cai para scores **SIMULADOS** (seed no config) e
+- Scores reais desde 07/11: 196 ataques, **1 rodada** por notícia (decisão do grupo; `llm.rodadas` no config), distribuição
+  1: 14, 2: 91, 3: 65, 4: 25, 5: 1. Se `scores.csv` sumir, o modelo cai para scores **SIMULADOS** (seed no config) e
   marca toda saída como tal (nome do arquivo e título).
 - Regras da geração (para quem roda o LLM): entrada só `texto_original` e a data, **nunca** `valor_roubado_usd`;
-  prompt e régua versionados e congelados antes do teste; 3 a 5 rodadas por notícia e mediana; régua validada com
+  prompt e régua versionados e congelados antes do teste; 1 rodada por notícia (decisão do grupo em 07/11; a especificação pedia 3 a 5 e mediana); régua validada com
   30 a 40 notícias rotuladas à mão; H3 com o nome do protocolo mascarado e com os ataques após o corte de
   conhecimento do modelo.
 
@@ -225,7 +226,7 @@ R_e(estratégia) = R_e(CCI10) + π_e
 - [x] ~~Janela do retorno normal~~ → [−180, −61] (07/11).
 - [x] ~~Modelo simples para H2 além de "vender sempre"~~ → H2 = b na regressão da CAR + backtest contra o modelo base (06/11).
 - [x] ~~Data de entrega de `dados/llm/scores.csv`~~ → entregue em 07/11, com 1 rodada.
-- [ ] Rodar mais 2 a 4 rodadas do LLM (a especificação pede 3 a 5 e mediana; custa 394 a 788 chamadas)?
+- [x] ~~Rodadas do LLM~~ → 1 rodada por notícia (decisão do grupo, 07/11), em vez das 3 a 5 da especificação.
 - [x] ~~Modelo principal~~ → event study com CAR; VAR-X com faixas vira robustez (07/11).
 - [x] ~~Janela de negociação~~ → ataques de 2026; treino = 2020–2025 (07/11).
 - [ ] Treino fixo (só 2020–2025) ou expansivo ao longo de 2026 no backtest.

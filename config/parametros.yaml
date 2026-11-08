@@ -2,7 +2,7 @@
 
 amostra:
   inicio_teste: "2026-01-01"   # ataques a partir daqui = negociação; antes = estimação (2020–2025)
-  excluir: [E519]              # mesmo incidente que E524 (2 s de diferença); fica o E524, o anúncio mais antigo
+  excluir: [E519]              # duplicata do E524; já saiu da base em 07/11, fica aqui só como trava
   precos: dados/precos/minuto_janela_ataques.csv.gz
 
 modelo:
@@ -18,7 +18,7 @@ modelo:
 llm:
   scores: dados/llm/scores.csv  # event_id, gravidade (1–5), n_rodadas — gerado por scripts/03_score_llm.py
   modelo: claude-opus-5-5
-  rodadas: 1                    # a leva de 07/11 fez 1 rodada por notícia; a especificação pede 3 a 5 (decisão do grupo)
+  rodadas: 1                    # decisão do grupo (07/11): 1 rodada por notícia; a especificação pedia 3 a 5
   seed_simulados: 42            # só se scores.csv não existir: score sorteado de 1 a 5
 
 janela:

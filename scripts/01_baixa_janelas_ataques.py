@@ -5,7 +5,7 @@ Fonte: https://data.binance.vision (arquivo público do spot, pares contra USDT,
   data/spot/daily/klines/{PAR}/1m/    arquivos diários, que existem desde 2021-03-01
   data/spot/monthly/klines/{PAR}/1m/  arquivos mensais, usados quando não há diário
 
-Entrada: dados/eventos/coleta_tweets_ataques.xlsx (timestamp_utc dos 197 ataques com tweet)
+Entrada: dados/eventos/coleta_tweets_ataques.xlsx (timestamp_utc dos 196 ataques com tweet)
 
 Saídas:
   dados/precos/brutos/{PAR}/*.zip                   zips originais, conferidos pelo .CHECKSUM (SHA-256)
