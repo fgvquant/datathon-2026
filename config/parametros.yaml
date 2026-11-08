@@ -1,19 +1,19 @@
 # Parâmetros do pipeline. Nada disso fica fixo no código (CLAUDE.md, seção 2).
 
 amostra:
-  inicio_teste: "2026-01-01"   # ataques a partir daqui = negociação; antes = estimação (2020–2025)
-  excluir: [E519]              # duplicata do E524; já saiu da base em 07/11, fica aqui só como trava
+  inicio_teste: '2026-01-01' # ataques a partir daqui = negociação; antes = estimação (2020–2025)
+  excluir: [E519] # duplicata do E524; já saiu da base em 07/11, fica aqui só como trava
   precos: dados/precos/minuto_janela_ataques.csv.gz
 
 modelo:
-  car_pre: [-10, 0]            # faixa da CAR pré (descritiva)
+  car_pre: [-30, 0] # faixa da CAR pré (descritiva); era [−10, 0] até 08/11
   velas_tabela: [1, 2, 5, 10, 15, 30, 60, 180]
-  vela_venda: 2                # vale e meia-vida contam a partir daqui (índice h = vela − 1)
+  vela_venda: 2 # vale e meia-vida contam a partir daqui (índice h = vela − 1)
   minutos_seguidos: 3
   # H2 (decisão de 08/11): b comum às 10 moedas testado só nestas 3 velas, fixadas antes de rodar.
   # IC de 90% simples (sem Bonferroni); o relatório diz que são 3 testes.
   velas_teste_score: [10, 30, 60]
-  huber_t: 1.345               # constante do Huber na robustez do b comum
+  huber_t: 1.345 # constante do Huber na robustez do b comum
   bootstrap:
     replicas: 1000
     nivel_ic: 0.90
@@ -21,19 +21,23 @@ modelo:
 
 condicional:
   # Modelo condicional (08/11): retorno bruto desde a vela 0 ~ score + movimento bruto pré-anúncio, inclinações
-  # comuns às moedas. Substituiu o modelo com score como estratégia principal DEPOIS de ver 2026 (avisar no
-  # relatório); o Sharpe deflacionado só conta as combinações do condicional, então sai otimista.
-  janelas: [[-60, -11], [-10, 0]]   # pre60 e pre10 (velas, inclusive); só velas ≤ 0, conhecidas na venda
+  # comuns às moedas. Substituiu o modelo com score como estratégia principal; o Sharpe deflacionado só conta as combinações do condicional, então sai otimista.
+  janelas: [[-60, -11], [-10, 0]] # pre60 e pre10 (velas, inclusive); só velas ≤ 0, conhecidas na venda
+
+corretagem:
+  # Taxa spot da Binance por lado (fração), gravada pelo 01 em cada vela da base de preços (taxa_venda_spot,
+  # taxa_compra_spot). Taxa padrão assumida, igual em todo o período; confirmar a de cada período.
+  taxa_spot_por_lado: 0.001
 
 llm:
-  scores: dados/llm/scores.csv  # event_id, gravidade (1–5), n_rodadas — gerado por scripts/03_score_llm.py
+  scores: dados/llm/scores.csv # event_id, gravidade (1–5), n_rodadas — gerado por scripts/03_score_llm.py
   modelo: claude-opus-5-5
-  rodadas: 1                    # decisão do grupo (07/11): 1 rodada por notícia; a especificação pedia 3 a 5
-  seed_simulados: 42            # só se scores.csv não existir: score sorteado de 1 a 5
+  rodadas: 1 # decisão do grupo (07/11): 1 rodada por notícia; a especificação pedia 3 a 5
+  seed_simulados: 42 # só se scores.csv não existir: score sorteado de 1 a 5
 
 janela:
-  minutos_antes: 180            # vela −180 ...
-  minutos_depois: 180           # ... até a vela +180
+  minutos_antes: 180 # vela −180 ...
+  minutos_depois: 180 # ... até a vela +180
 
 retorno_normal:
   # Decidido em 07/11: termina 1h antes do anúncio. Nos dados de treino a queda pré-anúncio
@@ -45,22 +49,23 @@ placebo:
   # Placebo A: mesma hora, 1 semana antes. Se essa janela cruza a de outro ataque, tenta
   # 2, 3 e 4 semanas antes, nessa ordem. Sem opção válida, o ataque fica sem placebo.
   semanas_antes: [1, 2, 3, 4]
-  distancia_min_horas: 6        # centro do placebo a ≥ 6h de qualquer anúncio: as janelas de ±3h não se tocam
+  distancia_min_horas: 6 # centro do placebo a ≥ 6h de qualquer anúncio: as janelas de ±3h não se tocam
   arquivo: dados/placebo/minuto_janela_placebo.csv.gz
-  pasta_brutos: dados/placebo/brutos   # zips diários da Binance (fora do Git)
+  pasta_brutos: dados/placebo/brutos # zips diários da Binance (fora do Git)
 
 backtest:
   # Seção 7. Todas as combinações abaixo rodam o backtest inteiro (regra 4); o Sharpe deflacionado conta todas.
-  velas_venda: [2, 1, 5, 10]    # base: vela +2
-  treinos: [fixo, expansivo]    # fixo = só 2020–2025; expansivo = + ataques de 2026 já encerrados (+180) antes do operado
+  velas_venda: [2, 1, 5, 10] # base: vela +2
+  treinos: [fixo, expansivo] # fixo = só 2020–2025; expansivo = + ataques de 2026 já encerrados (+180) antes do operado
   carteiras_usd: [100000, 1000000, 10000000]
-  fracao_volume: 0.10           # ordem ≤ 10% do volume (USDT) da vela de venda e da de recompra
+  fracao_volume: 0.10 # ordem ≤ 10% do volume (USDT) da vela de venda e da de recompra
   custos:
     # Custo por ataque, moeda e minuto: colunas taxa_venda_spot (venda) e taxa_compra_spot (recompra) da base de
-    # preços, em fração (hoje 0,10%/lado em tudo, tipo_taxa = taxa_padrao_assumida). Recompra sempre na meia-vida.
-    corretagem: {arquivo: dados/precos/minuto_janela_ataques.csv.gz}
+    # preços, em fração, gravadas pelo 01 a partir de corretagem.taxa_spot_por_lado. Recompra sempre na meia-vida.
+    corretagem: { arquivo: dados/precos/minuto_janela_ataques.csv.gz }
     # Cenários constantes: pb por lado = taxa + spread/2 + impacto
-    binance: {taxa_pb: 10, spread_pb: 2, impacto_pb: 2}
-    sem_custo: {taxa_pb: 0, spread_pb: 0, impacto_pb: 0}
-  principal: {vela_venda: 2, treino: fixo, carteira_usd: 1000000, custo: corretagem}
-  pesos: dados/cci10/cci10_pesos_diarios.csv   # usa o peso do dia anterior ao ataque (conhecido antes dele)
+    binance: { taxa_pb: 10, spread_pb: 2, impacto_pb: 2 }
+    sem_custo: { taxa_pb: 0, spread_pb: 0, impacto_pb: 0 }
+  principal:
+    { vela_venda: 2, treino: fixo, carteira_usd: 1000000, custo: corretagem }
+  pesos: dados/cci10/cci10_pesos_diarios.csv # usa o peso do dia anterior ao ataque (conhecido antes dele)

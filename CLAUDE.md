@@ -79,7 +79,7 @@ Notação: e = ataque, i = moeda, t = minuto relativo ao anúncio (vela). h = í
 Retorno normal:     μ_{e,i} = média de r_{e,i,t} para t em [−180, −61]       (pb por minuto, da própria janela)
 Retorno anormal:    AR_{e,i,t} = r_{e,i,t} − μ_{e,i}
 CAR desde +1:       CAR_{e,i}(h) = Σ_{vela 1..h+1} AR_{e,i,t}                 h = 0..179  ← é este que importa para operar
-CAR pré:            CAR_pre_{e,i} = Σ_{t = −10..0} AR_{e,i,t}                 descritivo; não dá para operar
+CAR pré:            CAR_pre_{e,i} = Σ_{t = −30..0} AR_{e,i,t}                 descritivo; não dá para operar
 
 Modelo base (H1):         CR_i(h) = média de CAR_{e,i}(h) nos ataques da estimação
 Modelo com score (H2):    CAR_{e,i}(h) = a_i(h) + b_i(h) (g_e − ḡ) + ε_{e,i}(h)    MQO por moeda e por h
@@ -94,6 +94,8 @@ Modelo com score (H2):    CAR_{e,i}(h) = a_i(h) + b_i(h) (g_e − ḡ) + ε_{e,i
   `a_i(h)` igual ao efeito do ataque médio, comparável ao modelo base. No modelo base, `b = 0` e `a_i(h) = CR_i(h)`.
 - O score só existe a partir do anúncio; ele explica a CAR desde a vela +1 (e, descritivamente, a CAR da vela 0).
   Não use o score para explicar a CAR pré.
+- **CAR pré em [−30, 0]** (decidido em 08/11, era [−10, 0]): nos 151 de treino, a queda pré dobra (−7 → −14 pb na
+  média das moedas) com o placebo perto de zero; [−60, 0] só somava ruído. Escolhida olhando o treino; é só descritiva.
 - **Janelas sobrepostas:** três pares de ataques estão a menos de 3 h um do outro (E155–E156, E290–E288, E391–E393).
   O retorno normal e a CAR de um deles contêm o outro ataque. Sinalize no relatório e rode a robustez sem esses pares.
 - **Intervalos:** bootstrap **por ataque** (reamostra ataques inteiros com reposição, 1.000 réplicas), nunca por

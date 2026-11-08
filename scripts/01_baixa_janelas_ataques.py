@@ -7,6 +7,7 @@ Fonte: https://data.binance.vision (spot, pares contra USDT, velas de 1 minuto)
   data/spot/monthly/klines/{PAR}/1m/  um zip por mês   — usado antes disso ou se faltar o zip do dia
 
 Entrada: dados/eventos/coleta_tweets_ataques.xlsx (timestamp_utc dos 196 ataques com tweet)
+         config/parametros.yaml (corretagem.taxa_spot_por_lado: taxa da Binance spot gravada em cada vela)
 
 Saídas:
   dados/precos/brutos/{PAR}/*.zip                   zips originais, conferidos pelo .CHECKSUM (SHA-256)
@@ -19,6 +20,8 @@ Regras:
     A vela +1 é a primeira inteira depois do anúncio. A janela vai de -180 a +180 (361 velas).
   - Minuto sem vela continua na base, com vela_ausente = True e preços vazios. Nada é preenchido.
   - Minuto com vela e sem negócio fica com sem_negocio = True.
+  - Custo: taxa_venda_spot e taxa_compra_spot (fração por lado), taxa_total_spot (ida e volta) e tipo_taxa, iguais
+    em todas as velas (taxa padrão assumida, do config). O backtest (05) lê essas colunas.
 
 Usa o curl do sistema. Se cair no meio, é só rodar de novo: o que já foi baixado é pulado.
 Como rodar (na pasta do projeto):  python scripts/01_baixa_janelas_ataques.py
@@ -26,6 +29,7 @@ Como rodar (na pasta do projeto):  python scripts/01_baixa_janelas_ataques.py
 import hashlib, io, os, subprocess, zipfile
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
+import yaml
 
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # caminhos relativos à raiz do repositório
 
@@ -34,6 +38,7 @@ PASTA = 'dados/precos/brutos'
 MOEDAS = ['BTC', 'ETH', 'XRP', 'BNB', 'ADA', 'LINK', 'XLM', 'TRX', 'LTC', 'BCH']
 MIN_ANTES, MIN_DEPOIS = 180, 180
 INICIO_DIARIO = pd.Timestamp('2021-03-01')
+TAXA = yaml.safe_load(open('config/parametros.yaml', encoding='utf-8'))['corretagem']['taxa_spot_por_lado']
 CAMPOS = ['open_time', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_volume', 'n_trades', 'taker_buy_base', 'taker_buy_quote', 'ignore']
 
 
@@ -132,8 +137,11 @@ s['vela_ausente'] = s.open.isna()
 s['sem_negocio'] = pd.to_numeric(s.n_trades).eq(0)
 s = s.rename(columns={'minuto': 'hora_utc'}).sort_values(['event_id', 'moeda', 'minuto_relativo'])
 s['hora_utc'] = s.hora_utc.dt.strftime('%Y-%m-%d %H:%M:%S')
+s['taxa_venda_spot'] = s['taxa_compra_spot'] = TAXA
+s['taxa_total_spot'] = 2 * TAXA
+s['tipo_taxa'] = 'taxa_padrao_assumida'
 ordem = ['event_id', 'hora_referencia_utc', 'moeda', 'par', 'minuto_relativo', 'hora_utc', 'open', 'high', 'low', 'close', 'volume', 'quote_volume', 'n_trades',
-         'taker_buy_base', 'taker_buy_quote', 'vela_ausente', 'sem_negocio']
+         'taker_buy_base', 'taker_buy_quote', 'vela_ausente', 'sem_negocio', 'taxa_venda_spot', 'taxa_compra_spot', 'taxa_total_spot', 'tipo_taxa']
 s[ordem].to_csv('dados/precos/minuto_janela_ataques.csv.gz', index=False, encoding='utf-8')  # o .gz no nome faz o pandas compactar
 
 # ---- cobertura
