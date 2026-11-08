@@ -6,7 +6,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.modelo import calcula_car, pesos_bootstrap, regressao_score, vale_meia_vida  # noqa: E402
+from src.modelo import (b_comum_huber, calcula_car, inclinacao_comum, pesos_bootstrap, regressao_score,  # noqa: E402
+                        vale_meia_vida)
 
 VELAS = np.arange(-180, 181)
 
@@ -70,3 +71,25 @@ def test_vale_e_meia_vida():
     assert (cr[h_meia:h_meia + 3] <= fundo / 2 + 1e-9).all()
     assert not (cr[h_meia - 1:h_meia + 2] <= fundo / 2).all()
     assert vale_meia_vida(np.linspace(0, 10, 180)) == (1, 1)   # sem queda: sai na hora
+
+
+def test_b_comum_mqo_e_huber():
+    rng = np.random.default_rng(5)
+    E, I = 200, 10
+    g = rng.integers(1, 6, E).astype(float)
+    a_i = np.linspace(-50, 0, I)                           # interceptos diferentes por moeda
+    car = a_i[None, :] - 4 * (g - g.mean())[:, None] + rng.normal(0, 3, (E, I))
+    _, b_i, _ = regressao_score(car[:, :, None], g)
+    b_c = inclinacao_comum(b_i)
+    assert b_c.shape == (I, 1) and np.allclose(b_c, b_c[0]) and np.isclose(b_c[0, 0], -4, atol=0.2)
+    # igual ao MQO empilhado com dummy de moeda
+    X = np.column_stack([np.tile(np.eye(I), (E, 1)), np.repeat(g - g.mean(), I)])
+    assert np.isclose(np.linalg.lstsq(X, car.ravel(), rcond=None)[0][-1], b_c[0, 0])
+    assert np.isclose(b_comum_huber(car, g), -4, atol=0.2)
+    # 5 ataques de nota 5 com CAR de −2.000 pb: o MQO se afasta de −4, o Huber não
+    car_out = car.copy()
+    car_out[np.flatnonzero(g == 5)[:5]] = -2000
+    b_mqo = inclinacao_comum(regressao_score(car_out[:, :, None], g)[1])[0, 0]
+    assert abs(b_mqo + 4) > 10 and np.isclose(b_comum_huber(car_out, g), -4, atol=0.5)
+    reps = b_comum_huber(car, g, pesos_bootstrap(E, 5, 1))
+    assert reps.shape == (5,) and np.allclose(reps, -4, atol=0.5)

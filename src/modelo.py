@@ -82,6 +82,39 @@ def regressao_score(car, g, pesos=None):
     return (a[0], b[0], gbar[0]) if pesos is None else (a, b, gbar)
 
 
+def inclinacao_comum(b):
+    """b comum às moedas: média de b_i(h) entre as moedas, repetida em cada moeda.
+
+    Entra: b [I, H] ou [R, I, H] (pb por ponto de score), saído de regressao_score. Sai: mesma forma.
+    Com painel balanceado (todas as moedas com os mesmos ataques e o mesmo g), isso é exatamente o MQO empilhado
+    CAR_{e,i}(h) = a_i(h) + b(h) (g_e − ḡ) + ε, com dummy de moeda: x é o mesmo em toda moeda, então o
+    numerador da inclinação é a soma dos numeradores por moeda e o denominador é I vezes o de uma moeda.
+    """
+    return np.broadcast_to(b.mean(-2, keepdims=True), b.shape)
+
+
+def b_comum_huber(car_h, g, pesos=None, t=1.345):
+    """b comum às moedas por regressão robusta de Huber (robustez do MQO), em uma vela.
+
+    Entra: car_h [E, I] (pb, CAR de uma vela); g [E] (score 1–5); pesos [R, E] (contagens do bootstrap) ou None;
+           t = constante de Huber em desvios-padrão robustos (1,345 → ~95% de eficiência sob erro normal).
+    Sai:   b (pb por ponto de score), escalar ou [R].
+    Modelo empilhado (E·I linhas): CAR_{e,i} = a_i + b (g_e − ḡ) + ε, com dummy de moeda, estimado por RLM com
+    HuberT e escala MAD. No bootstrap, cada ataque entra tantas vezes quanto a contagem dele.
+    """
+    import statsmodels.api as sm
+    E, I = car_h.shape
+
+    def ajusta(idx):
+        x = np.repeat(g[idx] - g[idx].mean(), I)                         # linhas: ataque por fora, moeda por dentro
+        X = np.column_stack([np.tile(np.eye(I), (len(idx), 1)), x])
+        return sm.RLM(car_h[idx].ravel(), X, M=sm.robust.norms.HuberT(t)).fit().params[-1]
+
+    if pesos is None:
+        return ajusta(np.arange(E))
+    return np.array([ajusta(np.repeat(np.arange(E), c.astype(int))) for c in pesos])
+
+
 def vale_meia_vida(cr, h_venda=1, seguidos=3):
     """Vale e meia-vida de uma ou várias curvas CR (seção 5), em índice h.
 

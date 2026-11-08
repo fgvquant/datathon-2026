@@ -10,6 +10,10 @@ modelo:
   velas_tabela: [1, 2, 5, 10, 15, 30, 60, 180]
   vela_venda: 2                # vale e meia-vida contam a partir daqui (índice h = vela − 1)
   minutos_seguidos: 3
+  # H2 (decisão de 08/11): b comum às 10 moedas testado só nestas 3 velas, fixadas antes de rodar.
+  # IC de 90% simples (sem Bonferroni); o relatório diz que são 3 testes.
+  velas_teste_score: [10, 30, 60]
+  huber_t: 1.345               # constante do Huber na robustez do b comum
   bootstrap:
     replicas: 1000
     nivel_ic: 0.90
