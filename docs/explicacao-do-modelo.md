@@ -241,13 +241,45 @@ Leitura:
 
 # O que falta fazer
 
+## Estado em 07/11 (noite)
+
+Branch `modelo/janela-normal-e-placebo`, commitada e **ainda sem push nem PR** (já traz a main com os arquivos do LLM).
+
+**Feito**
+- Placebo A baixado (`dados/placebo/minuto_janela_placebo.csv.gz`): 197 janelas, 191 a 1 semana e 6 a 2 semanas
+  antes (E068, E107, E154, E331, E410, E561, que cruzavam outro ataque). Integridade conferida.
+- Retorno normal passou a [−180, −61] (vazamento antes do anúncio contaminava o μ).
+- Event study completo em `src/modelo.py` + `scripts/04_modelo.py`: CAR, CR por moeda, bootstrap por ataque, vale,
+  meia-vida, modelo com score, placebo, tabelas e gráficos em `results/parametros/`. Testes em `tests/`.
+- Arquivos do LLM organizados em `dados/llm/` e `scripts/03_score_llm.py`; `scores.csv` real (1 rodada).
+
+**Primeiros resultados (151 ataques de treino)**
+- H1: queda gradual, ~−1 pb na vela +1 e −15 a −35 pb em +60; em BTC, ETH, BNB, LINK e TRX o IC de +60 exclui o
+  zero. Placebo perto de zero. Em +180 todos os IC cruzam o zero. CAR pré de −5 a −12 pb.
+- H2: o score não explica a CAR. Só 2 de 80 coeficientes `b` (moeda × vela) com IC fora do zero, menos que o acaso.
+- Vale muito instável (IC de ~30 a ~170); meia-vida entre as velas 12 e 39.
+
+**Como rodar** (o Python 3.11 da máquina do Lucas é 32 bits e não instala pandas; usar o `.venv` com 3.14):
+```
+.venv/Scripts/python -m pytest tests
+.venv/Scripts/python scripts/04_modelo.py
+```
+
+**Próximos passos**
+1. Push e PR da branch para revisão.
+2. Grupo decidir: rodadas do LLM (1 hoje; especificação pede 3 a 5 → mais 394 a 788 chamadas pagas) e saída base
+   (vale ou meia-vida).
+3. Backtest (seção 7 do CLAUDE.md), ainda não começado.
+4. Robustezes do modelo (lista abaixo), cada uma como um YAML em `config/` passado com `--config`.
+
 ## Decisões do grupo (padrão provisório)
 
 | Ponto | Padrão hoje |
 | --- | --- |
 | E519 ou E524 (mesmo incidente) | fica o E524 |
 | 8 horários suspeitos e 3 possíveis não-ataques | ficam na amostra, só sinalizados |
-| Leitura dos "3 minutos seguidos" no vale | início do bloco de 3 minutos com o fundo mais baixo |
+| Leitura dos "3 minutos seguidos" no vale | início do bloco de 3 minutos com o fundo mais baixo; meia-vida = 1º bloco de 3 minutos todo abaixo da metade da queda; sem queda depois da venda, vale = meia-vida = vela de venda |
+| Rodadas do LLM | 1 (é o que foi rodado em 07/11); a especificação pede 3 a 5 |
 | Saída base: vale ou meia-vida | os dois são calculados; a meia-vida é mais estável |
 | Modelo principal | event study com CAR; VAR-X com faixas só como robustez (decidido em 07/11) |
 | Janela do retorno normal | −180 a −61 (decidido em 07/11; congelada antes do backtest) |
