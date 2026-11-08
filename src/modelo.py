@@ -53,6 +53,37 @@ def calcula_car(close, normal=(-180, -61), pre=(-10, 0)):
             "car_pre": ar[..., j(pre[0]): j(pre[1]) + 1].sum(axis=-1)}
 
 
+def retorno_bruto(close, janelas=((-60, -11), (-10, 0))):
+    """Retorno bruto (sem μ) desde a vela 0 e movimentos pré-anúncio, para o modelo condicional.
+
+    Entra: close [E, I, 361]; janelas = faixas (vela inicial, vela final) do movimento pré-anúncio.
+    Sai:   y [E, I, 180] (pb, y[..., h] = 1e4 ln(P_{vela h+1} / P_{vela 0})) e
+           x [E, I, K] (pb, x[..., k] = 1e4 ln(P_fim / P_{inicio−1}), soma dos retornos das velas da faixa k).
+    Sem μ de propósito: com AR, preditor e drift descontam o mesmo μ e o erro dele cria correlação espúria
+    (aparece igual no placebo).
+    """
+    lp = 1e4 * np.log(close)
+    p = lambda vela: vela - T0
+    y = lp[..., p(1):] - lp[..., p(0), None]
+    x = np.stack([lp[..., p(fim)] - lp[..., p(ini - 1)] for ini, fim in janelas], axis=-1)
+    return y, x
+
+
+def regressao_condicional(y, g, x):
+    """MQO empilhado y_{e,i}(h) = a_i(h) + b(h)(g_e − ḡ) + Σ_k c_k(h)(x_{e,i,k} − x̄_{i,k}) + ε, por h.
+
+    Entra: y [E, I, H] (pb); g [E] (score 1–5); x [E, I, K] (pb, preditores por ataque e moeda).
+    Sai:   a [I, H] (pb, média de y por moeda = efeito do ataque médio), coef [1+K, H] (b em pb por ponto de score,
+           c_k em pb por pb) e zbar [I, 1+K] (médias usadas para centrar: ḡ e x̄_i).
+    Inclinações comuns às moedas; centrar por moeda equivale à dummy de moeda. Curva de um ataque novo com
+    z = [g, x_1..x_K] por moeda ([I, 1+K]): a + (z − zbar) @ coef.
+    """
+    z = np.concatenate([np.broadcast_to(g[:, None, None], (*x.shape[:2], 1)), x], axis=-1)
+    zbar, a = z.mean(0), y.mean(0)
+    coef = np.linalg.lstsq((z - zbar).reshape(-1, z.shape[-1]), (y - a).reshape(-1, y.shape[-1]), rcond=None)[0]
+    return a, coef, zbar
+
+
 def pesos_bootstrap(n, replicas, seed):
     """Contagens [replicas, n]: quantas vezes cada ataque entra em cada réplica (reamostragem com reposição)."""
     idx = np.random.default_rng(seed).integers(0, n, (replicas, n))

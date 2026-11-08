@@ -1,4 +1,5 @@
-"""Event study: modelo base (H1) e modelo com score (H2) nos ataques de estimação (2020–2025), com placebo.
+"""Event study: modelo base (H1), modelo com score (H2) e modelo condicional (o do backtest) nos ataques de
+estimação (2020–2025), com placebo.
 
 Rode da raiz do repositório:
     python scripts/04_modelo.py [--config config/parametros.yaml]
@@ -7,10 +8,12 @@ Saída em results/<nome do config>/modelo/:
   tabelas/base_tabela.csv     por moeda: CAR_pre, CR nas velas da tabela, vale e meia-vida (vela), com IC; ataque e placebo
   tabelas/base_curvas.csv     CR(h) por moeda e vela, com IC; ataque e placebo
   graficos/base_curvas.png    gráfico das curvas
-  tabelas/score_comum_b, score_comum_curvas, score_comum_vale_meia_vida (.csv) e graficos/score_comum_curvas.png
-                              modelo com score, b comum às 10 moedas (principal); sufixo _SIMULADO se faltar o score
+  tabelas/score_comum_b.csv   modelo com score: b comum às 10 moedas por vela, com IC; sufixo _SIMULADO se faltar o score
   tabelas/score_comum_teste.csv  teste de H2: b comum nas velas_teste_score, MQO e Huber, com IC
-  robustez/score_b, score_curvas, score_vale_meia_vida (.csv) e score_curvas.png: b por moeda (apêndice)
+  tabelas/condicional_coef.csv e graficos/condicional_coef.png
+                              modelo condicional (retorno bruto ~ score + pré-anúncio, src.modelo.regressao_condicional):
+                              coeficiente de cada preditor no drift desde a vela de venda, y(h) − y(h_venda), com IC;
+                              ataque e placebo (no placebo, y e pré-anúncio da janela placebo, g do ataque)
 """
 import argparse
 import sys
@@ -28,10 +31,10 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
 from src.modelo import (b_comum_huber, calcula_car, carrega_janelas, inclinacao_comum, intervalo,  # noqa: E402
-                        media_ponderada, pesos_bootstrap, regressao_score, vale_meia_vida)
+                        media_ponderada, pesos_bootstrap, regressao_condicional, regressao_score, retorno_bruto,
+                        vale_meia_vida)
 
 AZUL, LARANJA, TINTA, MUDO, GRADE = "#2a78d6", "#eb6834", "#1f1f1e", "#898781", "#e1e0d9"
-RAMPA_SCORE = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"]  # g = 1..5, claro → escuro
 
 
 def amostra_estimacao(eventos, cfg):
@@ -79,13 +82,17 @@ def le_scores(eventos, cfg):
     return rng.integers(1, 6, len(eventos)).astype(float), True
 
 
-def grafico(curvas, moedas, titulo, arquivo, cor_de, rotulo_de, com_ic=lambda s: True):
-    """Pequenos múltiplos: uma CR por moeda, uma linha por série, faixa de IC nas séries com com_ic(serie)."""
-    fig, eixos = plt.subplots(2, 5, figsize=(16, 6.5), sharex=True, sharey=True)
+def grafico(curvas, moedas, titulo, arquivo, cor_de, rotulo_de, ncols=5, ylabel="CR (pb)"):
+    """Pequenos múltiplos: uma CR por moeda, uma linha por série, com faixa de IC.
+
+    `moedas` são os painéis (coluna `moeda` de curvas); com ncols ≠ 5 os eixos y ficam independentes.
+    """
+    nl = -(-len(moedas) // ncols)
+    fig, eixos = plt.subplots(nl, ncols, figsize=(16, max(4.5, 3.25 * nl)), sharex=True, sharey=ncols == 5,
+                              squeeze=False)
     for ax, moeda in zip(eixos.ravel(), moedas):
         for chave, d in curvas[curvas.moeda == moeda].groupby("serie", sort=False):
-            if com_ic(chave):
-                ax.fill_between(d.vela, d.ic_inf, d.ic_sup, color=cor_de(chave), alpha=0.15, linewidth=0)
+            ax.fill_between(d.vela, d.ic_inf, d.ic_sup, color=cor_de(chave), alpha=0.15, linewidth=0)
             ax.plot(d.vela, d.cr, color=cor_de(chave), linewidth=2, label=rotulo_de(chave))
         ax.axhline(0, color=MUDO, linewidth=1)
         ax.set_title(moeda, color=TINTA, fontsize=11, loc="left")
@@ -95,10 +102,10 @@ def grafico(curvas, moedas, titulo, arquivo, cor_de, rotulo_de, com_ic=lambda s:
             ax.spines[lado].set_visible(False)
         for lado in ("left", "bottom"):
             ax.spines[lado].set_color(GRADE)
-    for ax in eixos[1]:
+    for ax in eixos[-1]:
         ax.set_xlabel("vela (minutos desde o anúncio)", color=MUDO, fontsize=9)
     for ax in eixos[:, 0]:
-        ax.set_ylabel("CR (pb)", color=MUDO, fontsize=9)
+        ax.set_ylabel(ylabel, color=MUDO, fontsize=9)
     h, l = eixos[0, 0].get_legend_handles_labels()
     fig.legend(h, l, loc="upper right", frameon=False, ncol=len(l))
     fig.suptitle(titulo, x=0.01, ha="left", color=TINTA, fontsize=13)
@@ -114,7 +121,7 @@ def main(argv=None):
     cfg = yaml.safe_load(a.config.read_text(encoding="utf-8"))
     m, b = cfg["modelo"], cfg["modelo"]["bootstrap"]
     saida = RAIZ / "results" / a.config.stem / "modelo"
-    for sub in ("tabelas", "graficos", "robustez"):
+    for sub in ("tabelas", "graficos"):
         (saida / sub).mkdir(parents=True, exist_ok=True)
 
     close, eventos, moedas = carrega_janelas(RAIZ / cfg["amostra"]["precos"])
@@ -149,40 +156,16 @@ def main(argv=None):
     g_todos, simulado = le_scores(eventos, cfg)
     g = g_todos[est]
     sufixo = "_SIMULADO" if simulado else ""
-    a_, b_moeda, gbar = regressao_score(r["car"], g)
-    a_rep, b_moeda_rep, gbar_rep = regressao_score(r["car"], g, pesos)
+    b_moeda, gbar = regressao_score(r["car"], g)[1:]
+    b_moeda_rep = regressao_score(r["car"], g, pesos)[1]
 
-    # "por_moeda": um b_i(h) por moeda (score_*); "comum": b(h) igual nas 10 moedas (score_comum_*), seção 4
-    for variante, pre in (("por_moeda", "score"), ("comum", "score_comum")):
-        tab, graf = ("robustez", "robustez") if variante == "por_moeda" else ("tabelas", "graficos")
-        b_, b_rep = ((b_moeda, b_moeda_rep) if variante == "por_moeda"
-                     else (inclinacao_comum(b_moeda), inclinacao_comum(b_moeda_rep)))
-        lo, hi = intervalo(b_rep, b["nivel_ic"])
-        pd.DataFrame([{"moeda": moeda, "vela": v, "b": b_[k, v - 1], "ic_inf": lo[k, v - 1], "ic_sup": hi[k, v - 1]}
-                      for k, moeda in enumerate(moedas) for v in m["velas_tabela"]]
-                     ).to_csv(saida / tab / f"{pre}_b{sufixo}.csv", index=False, float_format="%.3f")
-
-        curvas_g, vm = [], []
-        for nota in range(1, 6):
-            crg = a_ + b_ * (nota - gbar)
-            crg_rep = a_rep + b_rep * (nota - gbar_rep)[:, None, None]
-            curvas_g.append(curvas_longas(crg, intervalo(crg_rep, b["nivel_ic"]), moedas, serie=nota))
-            for nome, i in (("vela_vale", 0), ("vela_meia_vida", 1)):
-                est_ = vale_meia_vida(crg, m["vela_venda"] - 1, m["minutos_seguidos"])[i] + 1
-                lo_, hi_ = intervalo(vale_meia_vida(crg_rep, m["vela_venda"] - 1, m["minutos_seguidos"])[i] + 1,
-                                     b["nivel_ic"])
-                vm += [{"moeda": moeda, "score": nota, "estatistica": nome, "estimativa": est_[k],
-                        "ic_inf": lo_[k], "ic_sup": hi_[k]} for k, moeda in enumerate(moedas)]
-        curvas_g = pd.concat(curvas_g)
-        curvas_g.to_csv(saida / tab / f"{pre}_curvas{sufixo}.csv", index=False, float_format="%.3f")
-        pd.DataFrame(vm).to_csv(saida / tab / f"{pre}_vale_meia_vida{sufixo}.csv", index=False, float_format="%.1f")
-        grafico(curvas_g, moedas, f"CR(h; g) por score, b {variante.replace('_', ' ')}"
-                f"{' — SCORES SIMULADOS' if simulado else ''} (ḡ = {gbar:.2f}; IC só em g = 1 e 5)",
-                saida / graf / f"{pre}_curvas{sufixo}.png",
-                lambda s: RAMPA_SCORE[s - 1], lambda s: f"g = {s}", lambda s: s in (1, 5))
+    # b(h) comum às 10 moedas (seção 4), uma linha por vela
+    b_c, b_c_rep = inclinacao_comum(b_moeda)[0], inclinacao_comum(b_moeda_rep)[:, 0]   # [H] e [R, H]
+    lo, hi = intervalo(b_c_rep, b["nivel_ic"])
+    pd.DataFrame([{"vela": v, "b": b_c[v - 1], "ic_inf": lo[v - 1], "ic_sup": hi[v - 1]} for v in m["velas_tabela"]]
+                 ).to_csv(saida / "tabelas" / f"score_comum_b{sufixo}.csv", index=False, float_format="%.3f")
 
     # ---------- teste de H2: b comum em 3 velas, MQO e Huber, IC simples ----------
-    b_c, b_c_rep = inclinacao_comum(b_moeda)[0], inclinacao_comum(b_moeda_rep)[:, 0]   # [H] e [R, H]
     teste = []
     for v in m["velas_teste_score"]:
         lo, hi = intervalo(b_c_rep[:, v - 1], b["nivel_ic"])
@@ -197,7 +180,31 @@ def main(argv=None):
     print(f"{len(m['velas_teste_score'])} testes, IC {b['nivel_ic']:.0%} percentil sem correção")
     print(teste.to_string(index=False, float_format=lambda x: f"{x:7.2f}"))
 
-    print(f"\nModelo com score{' (SIMULADO)' if simulado else ''}: ḡ = {gbar:.2f}. Saídas em {saida.relative_to(RAIZ)}")
+    print(f"\nModelo com score{' (SIMULADO)' if simulado else ''}: ḡ = {gbar:.2f}.")
+
+    # ---------- modelo condicional (o que o backtest usa): retorno bruto ~ score + pré-anúncio, com placebo ----------
+    jan, h_v = cfg["condicional"]["janelas"], m["vela_venda"] - 1
+    nomes = ["score"] + [f"pre[{i},{f}]" for i, f in jan]
+    sorteios = [np.repeat(np.arange(est.sum()), c.astype(int)) for c in pesos]   # mesmos sorteios do bootstrap acima
+    linhas, curvas_c = [], []
+    for amostra, cl in (("ataque", close), ("placebo", close_pl)):
+        y, x = (v[est] for v in retorno_bruto(cl, jan))
+        drift = lambda idx: (c := regressao_condicional(y[idx], g[idx], x[idx])[1]) - c[:, [h_v]]  # [1+K, H]
+        pont = drift(np.arange(len(y)))
+        lo, hi = intervalo(np.array([drift(s) for s in sorteios]), b["nivel_ic"])
+        for k, nome in enumerate(nomes):
+            linhas += [{"amostra": amostra, "preditor": nome, "vela": v, "coef": pont[k, v - 1],
+                        "ic_inf": lo[k, v - 1], "ic_sup": hi[k, v - 1]} for v in m["velas_teste_score"]]
+            curvas_c.append(curvas_longas(pont[k:k + 1], (lo[k:k + 1], hi[k:k + 1]), [nome], serie=amostra))
+    coef = pd.DataFrame(linhas)
+    coef.to_csv(saida / "tabelas" / f"condicional_coef{sufixo}.csv", index=False, float_format="%.4f")
+    grafico(pd.concat(curvas_c), nomes, f"Modelo condicional: efeito de cada preditor no drift desde a venda "
+            f"(vela +{h_v + 1}), treino e placebo (IC {b['nivel_ic']:.0%}; score em pb/ponto, pré em pb/pb)",
+            saida / "graficos" / f"condicional_coef{sufixo}.png", {"ataque": AZUL, "placebo": LARANJA}.get,
+            str.capitalize, ncols=len(nomes), ylabel="coeficiente")
+    print(f"\n=== Modelo condicional: drift desde a vela +{h_v + 1} ~ score + pré-anúncio (retorno bruto) ===")
+    print(coef.to_string(index=False, float_format=lambda v: f"{v:+.3f}"))
+    print(f"\nSaídas em {saida.relative_to(RAIZ)}")
 
 
 if __name__ == "__main__":

@@ -19,6 +19,12 @@ modelo:
     nivel_ic: 0.90
     seed: 20261107
 
+condicional:
+  # Modelo condicional (08/11): retorno bruto desde a vela 0 ~ score + movimento bruto pré-anúncio, inclinações
+  # comuns às moedas. Substituiu o modelo com score como estratégia principal DEPOIS de ver 2026 (avisar no
+  # relatório); o Sharpe deflacionado só conta as combinações do condicional, então sai otimista.
+  janelas: [[-60, -11], [-10, 0]]   # pre60 e pre10 (velas, inclusive); só velas ≤ 0, conhecidas na venda
+
 llm:
   scores: dados/llm/scores.csv  # event_id, gravidade (1–5), n_rodadas — gerado por scripts/03_score_llm.py
   modelo: claude-opus-5-5
@@ -46,15 +52,13 @@ placebo:
 backtest:
   # Seção 7. Todas as combinações abaixo rodam o backtest inteiro (regra 4); o Sharpe deflacionado conta todas.
   velas_venda: [2, 1, 5, 10]    # base: vela +2
-  saidas: [meia_vida]           # decidido em 08/11: recompra só na meia-vida
   treinos: [fixo, expansivo]    # fixo = só 2020–2025; expansivo = + ataques de 2026 já encerrados (+180) antes do operado
   carteiras_usd: [100000, 1000000, 10000000]
   fracao_volume: 0.10           # ordem ≤ 10% do volume (USDT) da vela de venda e da de recompra
   custos:
-    # Custo real por ataque, moeda e minuto (event_id, moeda, minuto_relativo, taxa_venda, taxa_recompra, corretagem).
-    # Por lado: taxa_venda + corretagem na venda; taxa_recompra + corretagem na recompra. Se o arquivo não existir,
-    # o cenário sai da grade e o principal cai para o próximo cenário (binance).
-    corretagem: {arquivo: dados/precos/minutos_tabela_ataques_com_corretagem.csv, unidade: fracao}  # fracao | pct | pb
+    # Custo por ataque, moeda e minuto: colunas taxa_venda_spot (venda) e taxa_compra_spot (recompra) da base de
+    # preços, em fração (hoje 0,10%/lado em tudo, tipo_taxa = taxa_padrao_assumida). Recompra sempre na meia-vida.
+    corretagem: {arquivo: dados/precos/minuto_janela_ataques.csv.gz}
     # Cenários constantes: pb por lado = taxa + spread/2 + impacto
     binance: {taxa_pb: 10, spread_pb: 2, impacto_pb: 2}
     sem_custo: {taxa_pb: 0, spread_pb: 0, impacto_pb: 0}

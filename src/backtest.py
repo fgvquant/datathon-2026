@@ -13,16 +13,15 @@ from src.modelo import vale_meia_vida
 POS = 181  # posição em close da vela de índice h = 0 (vela +1)
 
 
-def decide(cr, h_venda, saida, seguidos, custo_ida_volta_pb):
-    """Regra de venda por moeda.
+def decide(cr, h_venda, seguidos, custo_ida_volta_pb):
+    """Regra de venda por moeda, com recompra na meia-vida (decidido em 08/11).
 
-    Entra: cr [I, H] (pb), CR(·; g_e) estimada no treino; h_venda (índice); saida = "vale" ou "meia_vida";
-           seguidos = minutos seguidos do vale/meia-vida; custo de ida e volta em pb.
+    Entra: cr [I, H] (pb), curva esperada estimada no treino; h_venda (índice); seguidos = minutos seguidos da
+           meia-vida; custo de ida e volta em pb.
     Sai:   vende [I] (bool) e h_rec [I] (índice da recompra).
     Vende i se a queda esperada −[CR(h_rec) − CR(h_venda)] supera o custo de ida e volta.
     """
-    vale, meia = vale_meia_vida(cr, h_venda, seguidos)
-    h_rec = vale if saida == "vale" else meia
+    h_rec = vale_meia_vida(cr, h_venda, seguidos)[1]
     ganho = cr[:, h_venda] - cr[np.arange(len(cr)), h_rec]
     return ganho > custo_ida_volta_pb, h_rec
 
