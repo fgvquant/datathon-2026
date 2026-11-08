@@ -54,6 +54,9 @@ Formato longo: uma linha por ataque × moeda × minuto.
 | `volume`, `quote_volume`, `n_trades`, `taker_buy_base`, `taker_buy_quote` | volumes da vela (Binance) |
 | `vela_ausente` | a Binance não tem a vela; preços e volumes ficam vazios (nada é preenchido) |
 | `sem_negocio` | vela sem negócios (`n_trades = 0`) |
+| `taxa_venda_spot`, `taxa_compra_spot` | corretagem por lado, em fração (0,001 = 0,10%), lida pelo backtest |
+| `taxa_total_spot` | corretagem de ida e volta, em fração |
+| `tipo_taxa` | `taxa_padrao_assumida`: a taxa vem de `corretagem.taxa_spot_por_lado` no config, igual em todas as velas |
 
 Checagens esperadas: 361 velas por ataque e moeda, nenhuma linha repetida, nenhum preço ≤ 0, máxima ≥ mínima e
 minuto 0 batendo com `hora_referencia_utc`.
