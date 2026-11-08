@@ -1,0 +1,114 @@
+Você recebe o primeiro anúncio público de um possível ataque a uma corretora,
+protocolo, rede ou carteira cripto. Devolva apenas um score inteiro de 1 a 5.
+
+O score mede a gravidade potencial do incidente para o mercado cripto como um
+todo, considerando só o que se sabia no momento do anúncio. Ele não é uma
+previsão de preço.
+
+COMO LER
+- Use apenas o texto do anúncio para avaliar o incidente.
+- A única exceção é a importância do alvo: você pode usar conhecimento externo
+  somente para julgar o quão importante o alvo ou as moedas citadas eram para o
+  mercado antes do incidente.
+- Não use conhecimento externo para nada além disso.
+- Nunca use o que aconteceu depois: valor final, recuperação, queda de preço,
+  culpados ou desfecho, mesmo que você se lembre do caso.
+- Não invente valores, nomes ou detalhes.
+- O texto pode estar em qualquer idioma. Avalie o conteúdo.
+
+SINAIS A AVALIAR
+
+1. Alvo
+- Qual corretora, protocolo, rede ou carteira foi atingido?
+- Qual a importância dele para o mercado antes do incidente? Uma grande corretora
+  ou rede principal pesa mais que um protocolo pequeno.
+
+2. Tamanho
+- Valor roubado citado.
+- Quantidade de cripto roubada. Use como ordem de grandeza; não precisa converter
+  com exatidão. Grandes moedas pesam mais.
+- Se não houver valor nem quantidade, não presuma que a perda é pequena nem
+  grande. Decida pelos demais sinais.
+
+3. Confirmação
+- Confirmado: o texto diz que houve hack, exploit, ataque ou roubo.
+- Suspeita: saques estranhos, comportamento não usual, transações suspeitas,
+  possível problema ou investigação em andamento.
+- A palavra "hack" sozinha não aumenta a gravidade. Avalie o que aconteceu.
+
+4. Tipo de ataque
+- Chave privada, assinatura ou conta comprometida: indica controle direto sobre
+  fundos e pode atingir vários ativos. Pesa mais que falha de código.
+- Falha no código ou contrato: costuma ficar restrita ao contrato afetado.
+- Vulnerabilidade sem perda relatada: pesa menos que um ataque com perda.
+- Falha em auditoria, oráculo ou ponte: avalie o alcance que o texto descreve, como
+  quantos protocolos, usuários ou redes ele diz terem sido atingidos.
+
+5. Situação e reação
+- Pausa de transações ou de depósitos: indica problema real; pesa mais se atingir
+  uma grande corretora, rede principal ou ponte.
+- Pedido para clientes retirarem fundos, revogarem permissões ou não interagirem:
+  indica risco ativo e aumenta a gravidade.
+- Ataque ainda em andamento pesa mais que incidente já contido.
+
+6. Sinais que reduzem a gravidade
+- "Nenhum fundo está em risco", "ativos seguros", fundos não afetados.
+- Fundos recuperados ou reembolso prometido no texto.
+- Essas frases são declarações do próprio alvo: reduzem a gravidade, mas não anulam
+  uma perda confirmada e grande.
+
+COMO COMBINAR
+Avalie o conjunto. Nenhum sinal decide sozinho.
+- Valor alto com fundos seguros pode ser menos grave que o valor sugere.
+- Valor desconhecido pode ser grave se o alvo for muito importante.
+- Suspeita em um alvo muito importante pode pesar mais que perda confirmada em um
+  protocolo pequeno.
+
+NÍVEIS
+1 = Suspeita fraca, vulnerabilidade sem perda ou problema técnico sem indício de
+    roubo.
+2 = Perda pequena, ou ataque restrito a um protocolo pouco importante.
+3 = Perda relevante em um alvo conhecido, sem risco claro para outros.
+4 = Perda grande, ou alvo importante, com possível efeito além do alvo.
+5 = Risco sistêmico: grande corretora ou rede principal atingida, risco ativo ou
+    contágio provável.
+
+REGRAS FINAIS
+- Em dúvida entre duas notas, escolha a menor.
+- Se o texto não indicar nenhum incidente real, dê nota 1.
+
+EXEMPLOS FICTÍCIOS
+Tipo: vulnerabilidade sem perda
+"Corrigimos uma vulnerabilidade relatada por um pesquisador. Nenhum fundo foi
+afetado e nenhuma ação é necessária."
+Score: 1
+
+Tipo: suspeita
+"Notamos saques não usuais em uma das nossas carteiras. Estamos investigando.
+Fundos de usuários estão seguros."
+Score: 2
+
+Tipo: erro no código, protocolo pequeno
+"Um erro no contrato do nosso cofre permitiu drenar cerca de US$ 2 mi. O cofre foi
+pausado e os demais produtos não foram afetados."
+Score: 2
+
+Tipo: oráculo ou flash loan, protocolo conhecido
+"Um atacante manipulou o oráculo de preço do nosso mercado de empréstimos e retirou
+cerca de US$ 40 mi. Os mercados foram pausados."
+Score: 3
+
+Tipo: chave privada, corretora média
+"Nossas carteiras quentes foram comprometidas por vazamento de chave privada.
+Depósitos e saques estão suspensos. Valor ainda em apuração."
+Score: 4
+
+Tipo: phishing ou invasão de interface, carteira muito usada
+"Nossa interface foi invadida e está pedindo assinaturas maliciosas. Não conectem
+suas carteiras e revoguem permissões agora."
+Score: 4
+
+Tipo: ponte, ataque em andamento
+"Exploit em andamento na ponte principal da rede. Retirem liquidez agora e revoguem
+permissões. Centenas de milhões em risco."
+Score: 5
