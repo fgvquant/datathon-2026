@@ -3,13 +3,14 @@
 Rode da raiz do repositório:
     python scripts/04_modelo.py [--config config/parametros.yaml]
 
-Saída em results/<nome do config>/:
-  base_tabela.csv      por moeda: CAR_pre, CR nas velas da tabela, vale e meia-vida (vela), com IC; ataque e placebo
-  base_curvas.csv      CR(h) por moeda e vela, com IC; ataque e placebo
-  base_curvas.png      gráfico das curvas
-  score_b[_SIMULADO].csv, score_curvas[_SIMULADO].csv, score_vale_meia_vida[_SIMULADO].csv, score_curvas[_SIMULADO].png
-  score_comum_*        os mesmos quatro arquivos com b comum às 10 moedas
-  score_comum_teste.csv  teste de H2: b comum nas velas_teste_score, MQO e Huber, com IC
+Saída em results/<nome do config>/modelo/:
+  tabelas/base_tabela.csv     por moeda: CAR_pre, CR nas velas da tabela, vale e meia-vida (vela), com IC; ataque e placebo
+  tabelas/base_curvas.csv     CR(h) por moeda e vela, com IC; ataque e placebo
+  graficos/base_curvas.png    gráfico das curvas
+  tabelas/score_comum_b, score_comum_curvas, score_comum_vale_meia_vida (.csv) e graficos/score_comum_curvas.png
+                              modelo com score, b comum às 10 moedas (principal); sufixo _SIMULADO se faltar o score
+  tabelas/score_comum_teste.csv  teste de H2: b comum nas velas_teste_score, MQO e Huber, com IC
+  robustez/score_b, score_curvas, score_vale_meia_vida (.csv) e score_curvas.png: b por moeda (apêndice)
 """
 import argparse
 import sys
@@ -112,8 +113,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     cfg = yaml.safe_load(a.config.read_text(encoding="utf-8"))
     m, b = cfg["modelo"], cfg["modelo"]["bootstrap"]
-    saida = RAIZ / "results" / a.config.stem
-    saida.mkdir(parents=True, exist_ok=True)
+    saida = RAIZ / "results" / a.config.stem / "modelo"
+    for sub in ("tabelas", "graficos", "robustez"):
+        (saida / sub).mkdir(parents=True, exist_ok=True)
 
     close, eventos, moedas = carrega_janelas(RAIZ / cfg["amostra"]["precos"])
     close_pl, eventos_pl, moedas_pl = carrega_janelas(RAIZ / cfg["placebo"]["arquivo"])
@@ -130,12 +132,12 @@ def main(argv=None):
     tab, cr, ic = resumo_base(r, pesos, moedas, cfg)
     tab_pl, cr_pl, ic_pl = resumo_base(r_pl, pesos, moedas, cfg)
     tabela = pd.concat([tab.assign(amostra="ataque"), tab_pl.assign(amostra="placebo")])
-    tabela.to_csv(saida / "base_tabela.csv", index=False, float_format="%.2f")
+    tabela.to_csv(saida / "tabelas/base_tabela.csv", index=False, float_format="%.2f")
     curvas = pd.concat([curvas_longas(cr, ic, moedas, serie="ataque"),
                         curvas_longas(cr_pl, ic_pl, moedas, serie="placebo")])
-    curvas.to_csv(saida / "base_curvas.csv", index=False, float_format="%.3f")
+    curvas.to_csv(saida / "tabelas/base_curvas.csv", index=False, float_format="%.3f")
     grafico(curvas, moedas, f"CR por moeda: {est.sum()} ataques de 2020–2025 e placebo (IC {b['nivel_ic']:.0%})",
-            saida / "base_curvas.png", {"ataque": AZUL, "placebo": LARANJA}.get, str.capitalize)
+            saida / "graficos/base_curvas.png", {"ataque": AZUL, "placebo": LARANJA}.get, str.capitalize)
 
     fmt = lambda d: d.apply(lambda x: f"{x.estimativa:6.1f} [{x.ic_inf:6.1f};{x.ic_sup:6.1f}]", axis=1)
     for amostra, d in tabela.groupby("amostra"):
@@ -152,12 +154,13 @@ def main(argv=None):
 
     # "por_moeda": um b_i(h) por moeda (score_*); "comum": b(h) igual nas 10 moedas (score_comum_*), seção 4
     for variante, pre in (("por_moeda", "score"), ("comum", "score_comum")):
+        tab, graf = ("robustez", "robustez") if variante == "por_moeda" else ("tabelas", "graficos")
         b_, b_rep = ((b_moeda, b_moeda_rep) if variante == "por_moeda"
                      else (inclinacao_comum(b_moeda), inclinacao_comum(b_moeda_rep)))
         lo, hi = intervalo(b_rep, b["nivel_ic"])
         pd.DataFrame([{"moeda": moeda, "vela": v, "b": b_[k, v - 1], "ic_inf": lo[k, v - 1], "ic_sup": hi[k, v - 1]}
                       for k, moeda in enumerate(moedas) for v in m["velas_tabela"]]
-                     ).to_csv(saida / f"{pre}_b{sufixo}.csv", index=False, float_format="%.3f")
+                     ).to_csv(saida / tab / f"{pre}_b{sufixo}.csv", index=False, float_format="%.3f")
 
         curvas_g, vm = [], []
         for nota in range(1, 6):
@@ -171,11 +174,11 @@ def main(argv=None):
                 vm += [{"moeda": moeda, "score": nota, "estatistica": nome, "estimativa": est_[k],
                         "ic_inf": lo_[k], "ic_sup": hi_[k]} for k, moeda in enumerate(moedas)]
         curvas_g = pd.concat(curvas_g)
-        curvas_g.to_csv(saida / f"{pre}_curvas{sufixo}.csv", index=False, float_format="%.3f")
-        pd.DataFrame(vm).to_csv(saida / f"{pre}_vale_meia_vida{sufixo}.csv", index=False, float_format="%.1f")
+        curvas_g.to_csv(saida / tab / f"{pre}_curvas{sufixo}.csv", index=False, float_format="%.3f")
+        pd.DataFrame(vm).to_csv(saida / tab / f"{pre}_vale_meia_vida{sufixo}.csv", index=False, float_format="%.1f")
         grafico(curvas_g, moedas, f"CR(h; g) por score, b {variante.replace('_', ' ')}"
                 f"{' — SCORES SIMULADOS' if simulado else ''} (ḡ = {gbar:.2f}; IC só em g = 1 e 5)",
-                saida / f"{pre}_curvas{sufixo}.png",
+                saida / graf / f"{pre}_curvas{sufixo}.png",
                 lambda s: RAMPA_SCORE[s - 1], lambda s: f"g = {s}", lambda s: s in (1, 5))
 
     # ---------- teste de H2: b comum em 3 velas, MQO e Huber, IC simples ----------
@@ -189,7 +192,7 @@ def main(argv=None):
         teste.append({"vela": v, "metodo": "Huber", "b": b_comum_huber(car_v, g, t=m["huber_t"]),
                       "ic_inf": lo, "ic_sup": hi})
     teste = pd.DataFrame(teste)
-    teste.to_csv(saida / f"score_comum_teste{sufixo}.csv", index=False, float_format="%.3f")
+    teste.to_csv(saida / "tabelas" / f"score_comum_teste{sufixo}.csv", index=False, float_format="%.3f")
     print(f"\n=== H2: b comum às moedas (pb por ponto de score){' — SIMULADO' if simulado else ''} ===")
     print(f"{len(m['velas_teste_score'])} testes, IC {b['nivel_ic']:.0%} percentil sem correção")
     print(teste.to_string(index=False, float_format=lambda x: f"{x:7.2f}"))

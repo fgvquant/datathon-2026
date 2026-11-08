@@ -3,13 +3,15 @@
 Rode da raiz do repositório:
     python scripts/05_backtest.py [--config config/parametros.yaml]
 
-Saída em results/<nome do config>/:
-  backtest_operacoes.csv   um prêmio por ataque, modelo e combinação de parâmetros (pb), com R_e do CCI10 e da estratégia
-  backtest_metricas.csv    métricas por modelo e combinação (pb), Sharpe deflacionado sobre todas as combinações
-  backtest_acumulado.png   prêmio acumulado na combinação principal, uma linha por modelo
-  backtest_trades.csv      combinação principal, estratégia com score: uma linha por moeda vendida em cada ataque
-  backtest_estrategia.csv  combinação principal, estratégia com score: prêmio por ataque e retorno acumulado
-  backtest_vs_cci10.png    estratégia com score × CCI10 parado em 2026 (nível diário)
+Saída em results/<nome do config>/backtest/:
+  tabelas/trades.csv          combinação principal, estratégia com score: uma linha por moeda vendida em cada ataque
+  tabelas/estrategia.csv      combinação principal, estratégia com score: prêmio por ataque e retorno acumulado
+  tabelas/metricas.csv        métricas por modelo e combinação (pb), Sharpe deflacionado sobre todas as combinações
+  tabelas/operacoes.csv       um prêmio por ataque, modelo e combinação de parâmetros (pb), com R_e do CCI10 e da estratégia
+  graficos/estrategia_retorno.png   retorno acumulado da estratégia com score em 2026 (nível diário, base 100)
+  graficos/estrategia_vs_cci10.png  estratégia com score menos CCI10 parado, acumulado em 2026 (pb)
+  graficos/cci10_periodo.png        CCI10 de 2020 a 2026, com os períodos de estimação e negociação e os ataques
+  graficos/modelos_acumulado.png    prêmio acumulado na combinação principal: score, base, placebo e previsão perfeita
 
 Custos: cada cenário de `backtest.custos` é constante (taxa_pb, spread_pb, impacto_pb) ou vem de um arquivo por
 ataque, moeda e minuto (`arquivo`), com custo por lado = taxa_venda + corretagem na venda e taxa_recompra +
@@ -188,14 +190,88 @@ def grafico_vs_cci10(estr, cfg, arquivo, titulo):
     plt.close(fig)
 
 
+def estilo(ax):
+    """Grade e eixos recessivos, como nos outros gráficos do projeto."""
+    ax.grid(color="#e1e0d9", linewidth=0.6)
+    ax.tick_params(colors="#5f5e5a", labelsize=9)
+    for lado in ("top", "right"):
+        ax.spines[lado].set_visible(False)
+    for lado in ("left", "bottom"):
+        ax.spines[lado].set_color("#e1e0d9")
+
+
+def nivel_cci10():
+    """Nível diário do CCI10 (base 100 em 01/01/2020)."""
+    return pd.read_csv(RAIZ / "dados/cci10/cci10_nivel_diario.csv", parse_dates=["date"]).set_index("date").cci10
+
+
+def grafico_estrategia(estr, cfg, arquivo, titulo):
+    """Nível diário da estratégia com score em 2026, base 100 na véspera do período de negociação.
+
+    Estratégia = CCI10 × Π(1 + π_e), com π_e somado no dia do ataque. Traços no pé: um por ataque de 2026.
+    """
+    ini = pd.Timestamp(cfg["amostra"]["inicio_teste"])
+    nivel = nivel_cci10()
+    nivel = 100 * nivel[nivel.index >= ini - pd.Timedelta(days=1)] / nivel[nivel.index < ini].iloc[-1]
+    fator = pd.Series((1 + estr.premio_pb / 1e4).cumprod().to_numpy(), index=estr.hora_anuncio_utc.dt.normalize())
+    estrategia = nivel * fator.groupby(level=0).last().reindex(nivel.index, method="ffill").fillna(1)
+    fig, ax = plt.subplots(figsize=(11, 4.8))
+    ax.axhline(100, color="#898781", linewidth=1)
+    ax.plot(estrategia.index, estrategia, color=CORES["score"], linewidth=2)
+    ax.annotate(f"{estrategia.iloc[-1] - 100:+.1f}%".replace(".", ","), (estrategia.index[-1], estrategia.iloc[-1]),
+                xytext=(8, 0), textcoords="offset points", va="center", fontsize=10, color="#1f1f1e")
+    lo = ax.get_ylim()[0]
+    ax.plot(estr.hora_anuncio_utc, np.full(len(estr), lo), "|", color="#5f5e5a", markersize=10, clip_on=False)
+    ax.annotate("ataques", (estrategia.index[0], lo), xytext=(0, 8), textcoords="offset points", fontsize=8,
+                color="#5f5e5a")
+    ax.set_ylim(lo, None)
+    ax.set_ylabel(f"nível (base 100 em {ini - pd.Timedelta(days=1):%d/%m/%Y})", color="#5f5e5a", fontsize=9)
+    estilo(ax)
+    fig.suptitle(titulo, x=0.01, ha="left", fontsize=12, color="#1f1f1e")
+    fig.tight_layout()
+    fig.savefig(arquivo, dpi=150, facecolor="#fcfcfb")
+    plt.close(fig)
+
+
+def grafico_cci10(eventos, cfg, arquivo):
+    """CCI10 no período inteiro (escala log), com o período de negociação sombreado e um traço por ataque."""
+    nivel = nivel_cci10()
+    ini = pd.Timestamp(cfg["amostra"]["inicio_teste"])
+    fig, ax = plt.subplots(figsize=(11, 4.8))
+    ax.axvspan(ini, nivel.index[-1], color=CORES["score"], alpha=0.08, linewidth=0)
+    ax.plot(nivel.index, nivel, color="#1f1f1e", linewidth=1.4)
+    ax.set_yscale("log")
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0f}"))
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax.set_yticks([v for v in (100, 200, 500, 1000, 2000, 5000) if nivel.min() / 1.5 < v < nivel.max() * 1.5])
+    ax.set_xlim(nivel.index[0] - pd.Timedelta(days=30), nivel.index[-1] + pd.Timedelta(days=90))
+    lo, hi = ax.get_ylim()
+    teste = (eventos.hora_referencia_utc >= ini).to_numpy()
+    for m, cor in ((~teste, "#898781"), (teste, CORES["score"])):
+        ax.plot(eventos.hora_referencia_utc[m], np.full(m.sum(), lo), "|", color=cor, markersize=10, clip_on=False)
+    for x, txt in ((nivel.index[0], f"estimação: {(~teste).sum()} ataques"), (ini, f"negociação: {teste.sum()} ataques")):
+        ax.annotate(txt, (x, hi), xytext=(4, -14), textcoords="offset points", fontsize=9, color="#5f5e5a")
+    ax.set_ylim(lo, hi)
+    ax.annotate(f"{nivel.iloc[-1]:.0f}", (nivel.index[-1], nivel.iloc[-1]), xytext=(6, 0), textcoords="offset points",
+                va="center", fontsize=10, color="#1f1f1e")
+    ax.set_ylabel("nível (base 100 em 01/01/2020, escala log)", color="#5f5e5a", fontsize=9)
+    estilo(ax)
+    fig.suptitle(f"CCI10, {nivel.index[0]:%m/%Y} a {nivel.index[-1]:%m/%Y}", x=0.01, ha="left", fontsize=12,
+                 color="#1f1f1e")
+    fig.tight_layout()
+    fig.savefig(arquivo, dpi=150, facecolor="#fcfcfb")
+    plt.close(fig)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", type=Path, default=RAIZ / "config" / "parametros.yaml")
     a = ap.parse_args(argv)
     cfg = yaml.safe_load(a.config.read_text(encoding="utf-8"))
     bt = cfg["backtest"]
-    saida = RAIZ / "results" / a.config.stem
-    saida.mkdir(parents=True, exist_ok=True)
+    saida = RAIZ / "results" / a.config.stem / "backtest"
+    for sub in ("tabelas", "graficos"):
+        (saida / sub).mkdir(parents=True, exist_ok=True)
     d = le_dados(cfg)
 
     p = dict(bt["principal"])
@@ -212,7 +288,7 @@ def main(argv=None):
         if all(dict(zip(chaves, comb))[k] == v for k, v in p.items()):
             trades.append(t.assign(saida=comb[1]))
     ops = pd.concat(ops)
-    ops.to_csv(saida / "backtest_operacoes.csv", index=False, float_format="%.3f")
+    ops.to_csv(saida / "tabelas/operacoes.csv", index=False, float_format="%.3f")
 
     linhas = []
     for comb, x in ops.groupby(chaves, sort=False):
@@ -228,7 +304,7 @@ def main(argv=None):
     sr_tent = met.loc[met.modelo == "score", "ir"]
     met["sharpe_deflacionado"] = [sharpe_deflacionado(r.ir, r.n_ataques, r.assimetria, r.curtose, sr_tent)
                                   if np.isfinite(r.ir) else np.nan for r in met.itertuples()]
-    met.to_csv(saida / "backtest_metricas.csv", index=False, float_format="%.4f")
+    met.to_csv(saida / "tabelas/metricas.csv", index=False, float_format="%.4f")
 
     sel = np.logical_and.reduce([met[k] == p[k] for k in p])
     cols = ["saida", "modelo", "n_operados", "premio_medio_pb", "premio_acumulado_pb", "taxa_acerto", "ir", "t",
@@ -238,25 +314,32 @@ def main(argv=None):
 
     # ---------- estratégia com score na combinação principal: trades, acumulado e gráfico contra o CCI10 ----------
     trades = pd.concat(trades)
-    trades.to_csv(saida / "backtest_trades.csv", index=False, float_format="%.6g")
+    trades.to_csv(saida / "tabelas/trades.csv", index=False, float_format="%.6g")
     principal = ops[np.logical_and.reduce([ops[k] == p[k] for k in p])]
     estr = principal[principal.modelo == "score"].drop(columns="modelo").copy()
     # nível no fim do dia do ataque, base 100 na véspera do período de teste; estratégia = CCI10 × Π(1 + π_e)
-    nivel = pd.read_csv(RAIZ / "dados/cci10/cci10_nivel_diario.csv", parse_dates=["date"]).set_index("date").cci10
+    nivel = nivel_cci10()
     base = nivel[nivel.index < pd.Timestamp(cfg["amostra"]["inicio_teste"])].iloc[-1]
     estr["premio_acumulado_pb"] = estr.groupby("saida").premio_pb.transform(lambda x: 1e4 * ((1 + x / 1e4).cumprod() - 1))
     estr["cci10_nivel"] = 100 * nivel.reindex(estr.hora_anuncio_utc.dt.normalize(), method="ffill").to_numpy() / base
     estr["estrategia_nivel"] = estr.cci10_nivel * (1 + estr.premio_acumulado_pb / 1e4)
-    estr.to_csv(saida / "backtest_estrategia.csv", index=False, float_format="%.3f")
+    estr.to_csv(saida / "tabelas/estrategia.csv", index=False, float_format="%.3f")
     print(f"\nTrades da estratégia com score: {len(trades)} "
           f"({', '.join(f'{s}: {n}' for s, n in trades.saida.value_counts().items())})")
     print(estr.groupby("saida")[["premio_acumulado_pb", "cci10_nivel", "estrategia_nivel"]]
           .last().to_string(float_format=lambda v: f"{v:9.2f}"))
 
-    grafico_vs_cci10(estr, cfg, saida / "backtest_vs_cci10.png",
+    grafico_vs_cci10(estr, cfg, saida / "graficos/estrategia_vs_cci10.png",
                      f"Estratégia com score contra o CCI10 parado, 2026 ({len(estr.event_id.unique())} ataques)\n"
                      f"venda na vela +{p['vela_venda']}, recompra na {estr.saida.iloc[0].replace('_', '-')}, "
                      f"treino {p['treino']}, US$ {p['carteira_usd']:,.0f}, custo {p['custo']}")
+
+    recompra = estr.saida.iloc[0].replace("_", "-")
+    grafico_estrategia(estr[estr.saida == estr.saida.iloc[0]], cfg, saida / "graficos/estrategia_retorno.png",
+                       f"Estratégia com score: retorno acumulado em 2026 ({len(estr.event_id.unique())} ataques)\n"
+                       f"venda na vela +{p['vela_venda']}, recompra na {recompra}, treino {p['treino']}, "
+                       f"US$ {p['carteira_usd']:,.0f}, custo {p['custo']}")
+    grafico_cci10(d["eventos"], cfg, saida / "graficos/cci10_periodo.png")
 
     fig, eixos = plt.subplots(1, len(bt["saidas"]), figsize=(12, 4.5), sharey=True, squeeze=False)
     for ax, s in zip(eixos[0], bt["saidas"]):
@@ -274,7 +357,7 @@ def main(argv=None):
     fig.suptitle(f"Backtest 2026: venda na vela +{p['vela_venda']}, treino {p['treino']}, "
                  f"US$ {p['carteira_usd']:,.0f}, custo {p['custo']}", x=0.01, ha="left", fontsize=12)
     fig.tight_layout()
-    fig.savefig(saida / "backtest_acumulado.png", dpi=150, facecolor="#fcfcfb")
+    fig.savefig(saida / "graficos/modelos_acumulado.png", dpi=150, facecolor="#fcfcfb")
     print(f"\nSaídas em {saida.relative_to(RAIZ)}")
 
 
