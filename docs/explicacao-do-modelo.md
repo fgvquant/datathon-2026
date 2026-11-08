@@ -42,7 +42,8 @@ Imagine que medimos uma queda média de 15 pb depois dos ataques. Isso pode ter 
 3. aqueles horários do dia costumam ser ruins.
 
 O **placebo** separa o motivo 1 dos outros dois. Para cada ataque, pegamos o **mesmo dia da semana e o mesmo
-horário, 7 dias antes**, quando não houve ataque, e fazemos **exatamente a mesma conta**.
+horário, 7 dias antes**, quando não houve ataque, e fazemos **exatamente a mesma conta**. Se essa janela cai em
+cima de outro ataque (6 casos), usamos 2 semanas antes (ou 3, ou 4).
 
 - Se o placebo também cai 15 pb, a queda não tem nada a ver com o ataque.
 - Se o placebo dá perto de zero e o ataque dá −15 pb, a queda é do ataque.
@@ -94,8 +95,10 @@ retorno anormal = retorno do minuto − retorno normal
 ### Passo 1 — Retorno normal
 
 Cada janela tem o seu "clima": num dia o mercado estava subindo, em outro caindo. O **retorno normal** é a média dos
-retornos da própria janela entre o minuto −180 e o −11, longe do anúncio. A faixa de −10 a −1 fica de fora porque o
-ataque já está acontecendo na blockchain e a notícia pode vazar antes do tweet.
+retornos da própria janela entre o minuto −180 e o −61, longe do anúncio. A última hora antes do tweet fica de fora
+porque o ataque já está acontecendo na blockchain e a notícia pode vazar antes: nos dados de treino a queda começa
+antes do minuto −11. Se essa queda entrasse no "normal", o modelo acharia que cair é normal e atribuiria ao ataque
+só parte da queda depois do tweet.
 
 ### Passo 2 — Retorno anormal (AR)
 
@@ -196,15 +199,14 @@ Regras:
 - A relação é **linear**: cada ponto de nota vale o mesmo. Uma regressão por nota evitaria isso, mas sobrariam ~30
   ataques de treino por nota, o que é pouco.
 
-**Hoje as notas são SORTEADAS.** O arquivo com as notas reais (`dados/llm/scores.csv`) ainda não chegou. Enquanto
-isso, o modelo com score roda com notas sorteadas de 1 a 5, e tudo o que sai dele leva `_SIMULADO` no nome.
-**Esses números não significam nada e não podem ir para os slides.** O modelo base não usa nota nenhuma e vale
-desde já.
+**As notas reais chegaram em 07/11** (`dados/llm/scores.csv`, 1 rodada por notícia). Quase todas ficam entre 2 e
+3; só um ataque tem nota 5, então a curva de g = 5 é extrapolada pela reta e tem intervalo muito largo. Se o arquivo
+sumir, o modelo volta a sortear notas e marca tudo com `_SIMULADO` no nome; esses números não vão para os slides.
 
 ## 1.10 Testes de robustez
 
 - **Modelo de mercado:** em vez da média da janela, o retorno normal vem de uma regressão da moeda no mercado,
-  estimada em −180 a −11. Cuidado: se o mercado inteiro cai com o ataque, descontar o mercado tira parte do efeito.
+  estimada em −180 a −61. Cuidado: se o mercado inteiro cai com o ataque, descontar o mercado tira parte do efeito.
 - **VAR-X com faixas** (o modelo anterior): estima os padrões normais de um minuto para o outro e o efeito do
   ataque por faixa. Se a curva dele ficar parecida com a do event study, o resultado fica mais forte.
 - **Sem os pares de ataques próximos** e **sem os casos duvidosos** da base (seção 3 do CLAUDE.md).
@@ -239,22 +241,54 @@ Leitura:
 
 # O que falta fazer
 
+## Estado em 07/11 (noite)
+
+Branch `modelo/janela-normal-e-placebo`, commitada e **ainda sem push nem PR** (já traz a main com os arquivos do LLM).
+
+**Feito**
+- Placebo A baixado (`dados/placebo/minuto_janela_placebo.csv.gz`): 196 janelas, 190 a 1 semana e 6 a 2 semanas
+  antes (E068, E107, E154, E331, E410, E561, que cruzavam outro ataque). Integridade conferida.
+- Retorno normal passou a [−180, −61] (vazamento antes do anúncio contaminava o μ).
+- Event study completo em `src/modelo.py` + `scripts/04_modelo.py`: CAR, CR por moeda, bootstrap por ataque, vale,
+  meia-vida, modelo com score, placebo, tabelas e gráficos em `results/parametros/`. Testes em `tests/`.
+- Arquivos do LLM organizados em `dados/llm/` e `scripts/03_score_llm.py`; `scores.csv` real (1 rodada).
+
+**Primeiros resultados (151 ataques de treino)**
+- H1: queda gradual, ~−1 pb na vela +1 e −15 a −35 pb em +60; em BTC, ETH, BNB, LINK e TRX o IC de +60 exclui o
+  zero. Placebo perto de zero. Em +180 todos os IC cruzam o zero. CAR pré de −5 a −12 pb.
+- H2: o score não explica a CAR. Só 2 de 80 coeficientes `b` (moeda × vela) com IC fora do zero, menos que o acaso.
+- Vale muito instável (IC de ~30 a ~170); meia-vida entre as velas 12 e 39.
+
+**Como rodar** (o Python 3.11 da máquina do Lucas é 32 bits e não instala pandas; usar o `.venv` com 3.14):
+```
+.venv/Scripts/python -m pytest tests
+.venv/Scripts/python scripts/04_modelo.py
+```
+
+**Próximos passos**
+1. Push e PR da branch para revisão.
+2. Grupo decidir a saída base
+   (vale ou meia-vida).
+3. Backtest (seção 7 do CLAUDE.md), ainda não começado.
+4. Robustezes do modelo (lista abaixo), cada uma como um YAML em `config/` passado com `--config`.
+
 ## Decisões do grupo (padrão provisório)
 
 | Ponto | Padrão hoje |
 | --- | --- |
-| E519 ou E524 (mesmo incidente) | fica o E524 |
+| E519 ou E524 (mesmo incidente) | fica o E524; o E519 saiu da base dos colegas em 07/11 |
 | 8 horários suspeitos e 3 possíveis não-ataques | ficam na amostra, só sinalizados |
-| Leitura dos "3 minutos seguidos" no vale | início do bloco de 3 minutos com o fundo mais baixo |
+| Leitura dos "3 minutos seguidos" no vale | início do bloco de 3 minutos com o fundo mais baixo; meia-vida = 1º bloco de 3 minutos todo abaixo da metade da queda; sem queda depois da venda, vale = meia-vida = vela de venda |
+| Rodadas do LLM | 1 por notícia (decidido pelo grupo em 07/11; a especificação pedia 3 a 5) |
 | Saída base: vale ou meia-vida | os dois são calculados; a meia-vida é mais estável |
 | Modelo principal | event study com CAR; VAR-X com faixas só como robustez (decidido em 07/11) |
-| Janela do retorno normal | −180 a −11 (congelar antes do backtest) |
+| Janela do retorno normal | −180 a −61 (decidido em 07/11; congelada antes do backtest) |
 | Início da negociação | 01/01/2026 (45 ataques) |
 
 ## Dados
 
-- [ ] **Notas reais do LLM** (`dados/llm/scores.csv`, colunas `event_id`, `gravidade`, `n_rodadas`).
-- [ ] **Janelas placebo** (mesmo formato dos ataques, 7 dias antes).
+- [x] **Notas reais do LLM** (`dados/llm/scores.csv`, 196 ataques, 1 rodada por decisão do grupo).
+- [x] **Janelas placebo** (mesmo formato dos ataques, 7 dias antes): `scripts/02_baixa_placebo.py`.
 
 ## Modelo
 

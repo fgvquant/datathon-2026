@@ -24,11 +24,11 @@ de um argumento de eficiência de mercado, que também é um resultado válido.
 
 ```
 dados/
-  eventos/    coleta_tweets_ataques.xlsx — primeiro anúncio de cada ataque (os 197 com horário da v19)
+  eventos/    coleta_tweets_ataques.xlsx — primeiro anúncio de cada ataque (os 196 com horário da v19, sem o E519)
   precos/     minuto_janela_ataques.csv — velas de 1 min, ±3h em torno de cada anúncio
-  placebo/    janelas sem ataque (mesmo horário, uma semana antes)
+  placebo/    janelas sem ataque (mesmo horário, uma semana antes; 2–4 se cruzar outro ataque)
   cci10/      série diária e pesos do CCI10
-  llm/        scores.csv — score de gravidade do LLM por ataque (gerado fora deste repositório)
+  llm/        regua_llm.txt, respostas.jsonl (auditoria) e scores.csv — score de gravidade do LLM por ataque
 config/       parâmetros em YAML (janela do retorno normal, latência, custos...). Nada disso fica fixo no código.
 src/          funções reutilizáveis (pacote Python)
 scripts/      scripts curtos que chamam src/ e salvam em results/
@@ -48,9 +48,10 @@ O dicionário das bases está em `dados/README.md`.
   14:03:27, a vela 0 é a das 14:03 e a vela +1 é a das 14:04.
 - **Retorno** = log-retorno de 1 minuto em pontos-base, `1e4 * (ln P_t - ln P_{t-1})`, calculado **dentro** de cada
   janela. Nunca calcule retorno entre a última vela de um ataque e a primeira do seguinte.
-- **E519 e E524 são o mesmo incidente** (horários a 2 s de distância): use só um.
+- **E519 e E524 são o mesmo incidente** (horários a 2 s de distância): o E519 saiu da base em 07/11; fica o E524.
 - **Amostra principal:** ataques com `timestamp_utc` preenchido. Na v19 são 197 de 583 (188 "verificado no X" e
-  9 "achado, conferir se é o 1º"); 122 até 2024 e 75 em 2025–26.
+  9 "achado, conferir se é o 1º"); 122 até 2024 e 75 em 2025–26. Sem o E519, a base do repositório tem **196**
+  (187 "verificado no X").
 - **Treino e negociação (decidido pelo grupo):** a negociação são os **45 ataques de 2026**; o modelo é estimado só
   com os **151 de 2020–2025** (`amostra.inicio_teste` no config). Nenhum preço de 2026 entra na estimação.
 - **Saem só nos testes de robustez:** E583, rug pulls e anúncios não confirmados.
@@ -61,8 +62,9 @@ O dicionário das bases está em `dados/README.md`.
     E382 (post da Arkham).
   - 4 horários com segundos zerados (ex.: E257 às 20:20:00), que parecem digitados à mão.
   - 20 primeiros anúncios já mencionam reembolso ou desfecho (`menciona_desfecho = S`).
-- `minuto_janela_ataques.csv` cobre os 197 ataques da amostra principal (v19). Faltam as janelas placebo (Binance
-  spot, velas de 1 min, `data.binance.vision`), **no mesmo formato**.
+- `minuto_janela_ataques.csv` cobre os 196 ataques da amostra principal (v19 sem o E519). As janelas placebo (Binance spot,
+  velas de 1 min, `data.binance.vision`) saem de `scripts/02_baixa_placebo.py`, **no mesmo formato** mais a coluna
+  `semanas_antes`.
 
 ## 4. A. Modelo: event study intradiário (CAR)
 
@@ -75,7 +77,7 @@ então a propagação pelo VAR quase não mudava a curva. A comparação complet
 Notação: e = ataque, i = moeda, t = minuto relativo ao anúncio (vela). h = índice a partir da vela +1 (h = vela − 1).
 
 ```
-Retorno normal:     μ_{e,i} = média de r_{e,i,t} para t em [−180, −11]       (pb por minuto, da própria janela)
+Retorno normal:     μ_{e,i} = média de r_{e,i,t} para t em [−180, −61]       (pb por minuto, da própria janela)
 Retorno anormal:    AR_{e,i,t} = r_{e,i,t} − μ_{e,i}
 CAR desde +1:       CAR_{e,i}(h) = Σ_{vela 1..h+1} AR_{e,i,t}                 h = 0..179  ← é este que importa para operar
 CAR pré:            CAR_pre_{e,i} = Σ_{t = −10..0} AR_{e,i,t}                 descritivo; não dá para operar
@@ -85,8 +87,9 @@ Modelo com score (H2):    CAR_{e,i}(h) = a_i(h) + b_i(h) (g_e − ḡ) + ε_{e,i
                           CR_i(h; g) = a_i(h) + b_i(h) (g − ḡ)
 ```
 
-- **Janela do retorno normal** ([−180, −11]) fica em `config/`. Ela não inclui a faixa pré (−10 a −1) para o
-  vazamento antes do anúncio não contaminar o "normal".
+- **Janela do retorno normal** ([−180, −61], `retorno_normal` em `config/parametros.yaml`). Decidido em 07/11:
+  termina 1h antes do anúncio para o vazamento não contaminar o "normal". Nos 151 ataques de treino a queda bruta
+  já começa antes de −11; com [−180, −11] o μ absorvia ~8 pb da CR(+180). A escolha olhou só o pré-anúncio do treino.
 - **Uma CAR por minuto, sem faixas:** a curva tem a forma que os dados mostrarem, até +180. Nada é imposto depois de +60.
 - `g_e` = score de gravidade (1 a 5, seção 6). `ḡ` = média dos scores dos ataques usados na estimação; centrar mantém
   `a_i(h)` igual ao efeito do ataque médio, comparável ao modelo base. No modelo base, `b = 0` e `a_i(h) = CR_i(h)`.
@@ -97,7 +100,10 @@ Modelo com score (H2):    CAR_{e,i}(h) = a_i(h) + b_i(h) (g_e − ḡ) + ε_{e,i
 - **Intervalos:** bootstrap **por ataque** (reamostra ataques inteiros com reposição, 1.000 réplicas), nunca por
   minuto. IC percentil de 90%. No modelo com score, o score viaja com o ataque reamostrado e `ḡ` é recalculado em
   cada réplica.
-- **Placebo:** a mesma conta nas janelas placebo (μ da própria janela placebo); o efeito deve ser nulo.
+- **Placebo (placebo A, decidido em 07/11):** a mesma conta nas janelas placebo (μ da própria janela placebo); o
+  efeito deve ser nulo. Janela = mesma hora, 1 semana antes do ataque; se ela fica a menos de 6 h de outro anúncio,
+  usa 2, 3 ou 4 semanas antes (`placebo` no config). Vale para os dois períodos: o placebo dos 151 de treino vai na
+  tabela do modelo e o dos 45 de 2026 vai no backtest. Gerado por `scripts/02_baixa_placebo.py`.
 - **Propagação entre as moedas (H1, descritiva):** comparar a CR por moeda (quanto cai) e o minuto da meia-vida por
   moeda (quando cai). Robustez opcional: regressão do AR de cada moeda no AR defasado do BTC.
 - **Entrega do modelo base:** tabela por moeda com CAR_pre, CR nas velas **+1, +2, +5, +10, +15, +30, +60 e +180**,
@@ -106,7 +112,7 @@ Modelo com score (H2):    CAR_{e,i}(h) = a_i(h) + b_i(h) (g_e − ḡ) + ε_{e,i
   vale e meia-vida por score.
 
 **Robustez (não é o modelo principal):**
-- **Modelo de mercado:** `AR = r − (α + β r_m)`, com α e β estimados em [−180, −11]. Cuidado: se o mercado inteiro
+- **Modelo de mercado:** `AR = r − (α + β r_m)`, com α e β estimados em [−180, −61]. Cuidado: se o mercado inteiro
   cai com o ataque, descontar o mercado tira parte do efeito; leia junto com o modelo de média constante.
 - **VAR-X empilhado com dummies por faixa** (especificação anterior):
   `y_{e,t} = α_e + Σ_{j=1..p} A_j y_{e,t-j} + Σ_f [b0^f + b1^f (g_e − ḡ)] D^f_{e,t} + u_{e,t}`, faixas
@@ -133,12 +139,15 @@ h_1/2  = min{ h ≥ h_e : CR(h; g) − CR(h_vale; g) ≤ 0,5 [CR(h_e; g) − CR(
 - O LLM devolve **só a gravidade** do ataque: inteiro de 1 a 5, lido do texto do primeiro anúncio, segundo uma régua
   escrita com exemplos. Não há `confirma_ataque`, `moedas_expostas` nem regressão de calibração.
 - O score entra na regressão em corte transversal da CAR (seção 4).
-- Quem gera os scores é outro integrante do grupo. Este repositório só lê `dados/llm/scores.csv`, com as colunas
-  `event_id`, `gravidade` (mediana das rodadas, inteiro 1–5) e `n_rodadas`. Nenhum código aqui chama a API.
-- Enquanto `scores.csv` não existir, o modelo com score e o backtest rodam com scores **SIMULADOS** (seed fixa no
-  config), e toda saída é marcada como tal (nome do arquivo e título).
+- Quem gera os scores é outro integrante do grupo, com `scripts/03_score_llm.py` (o único que chama a API; peça
+  confirmação antes de rodá-lo com chamadas pendentes). Régua em `dados/llm/regua_llm.txt` (sha `8371eaa5be9e`),
+  respostas brutas em `dados/llm/respostas.jsonl`. O modelo só lê `dados/llm/scores.csv`, com as colunas
+  `event_id`, `gravidade` (mediana das rodadas, inteiro 1–5) e `n_rodadas`.
+- Scores reais desde 07/11: 196 ataques, **1 rodada** por notícia (decisão do grupo; `llm.rodadas` no config), distribuição
+  1: 14, 2: 91, 3: 65, 4: 25, 5: 1. Se `scores.csv` sumir, o modelo cai para scores **SIMULADOS** (seed no config) e
+  marca toda saída como tal (nome do arquivo e título).
 - Regras da geração (para quem roda o LLM): entrada só `texto_original` e a data, **nunca** `valor_roubado_usd`;
-  prompt e régua versionados e congelados antes do teste; 3 a 5 rodadas por notícia e mediana; régua validada com
+  prompt e régua versionados e congelados antes do teste; 1 rodada por notícia (decisão do grupo em 07/11; a especificação pedia 3 a 5 e mediana); régua validada com
   30 a 40 notícias rotuladas à mão; H3 com o nome do protocolo mascarado e com os ataques após o corte de
   conhecimento do modelo.
 
@@ -185,7 +194,7 @@ R_e(estratégia) = R_e(CCI10) + π_e
 - Seeds fixas em tudo que é aleatório (bootstrap, placebo, sorteios).
 - **Testes com dados simulados** em que a resposta é conhecida: por exemplo, plantar um ataque de −60 pb no BTC na
   vela +1 e −5 pb/min de +2 a +10 e conferir que a CR recupera −105 pb em +10; plantar `b = −4` e conferir a
-  estimativa; conferir que o retorno normal usa só [−180, −11]; conferir que o backtest nunca vê ataques futuros.
+  estimativa; conferir que o retorno normal usa só [−180, −61]; conferir que o backtest nunca vê ataques futuros.
 - Fluxo Git: uma branch por tarefa (`modelo/`, `llm/`, `backtest/`, `dados/`), Pull Request revisado por outra
   pessoa do grupo, testes verdes antes do merge.
 - **Mensagens de commit (obrigatório)** seguem o [gitmoji](https://gitmoji.dev), no formato
@@ -213,9 +222,11 @@ R_e(estratégia) = R_e(CCI10) + π_e
 
 - [ ] Quais dos 9 "achado, conferir" e dos 8 horários suspeitos entram na amostra.
 - [ ] Critério final de primeiro anúncio.
-- [ ] Quem baixa as janelas placebo (as janelas de ataque da v19 já estão completas).
+- [x] ~~Janelas placebo~~ → placebo A, 1 semana antes, pulando para 2–4 semanas se cruzar outro ataque (07/11).
+- [x] ~~Janela do retorno normal~~ → [−180, −61] (07/11).
 - [x] ~~Modelo simples para H2 além de "vender sempre"~~ → H2 = b na regressão da CAR + backtest contra o modelo base (06/11).
-- [ ] Data de entrega de `dados/llm/scores.csv` (até lá, scores simulados).
+- [x] ~~Data de entrega de `dados/llm/scores.csv`~~ → entregue em 07/11, com 1 rodada.
+- [x] ~~Rodadas do LLM~~ → 1 rodada por notícia (decisão do grupo, 07/11), em vez das 3 a 5 da especificação.
 - [x] ~~Modelo principal~~ → event study com CAR; VAR-X com faixas vira robustez (07/11).
 - [x] ~~Janela de negociação~~ → ataques de 2026; treino = 2020–2025 (07/11).
 - [ ] Treino fixo (só 2020–2025) ou expansivo ao longo de 2026 no backtest.

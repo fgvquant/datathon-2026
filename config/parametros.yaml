@@ -1,0 +1,40 @@
+# Parâmetros do pipeline. Nada disso fica fixo no código (CLAUDE.md, seção 2).
+
+amostra:
+  inicio_teste: "2026-01-01"   # ataques a partir daqui = negociação; antes = estimação (2020–2025)
+  excluir: [E519]              # duplicata do E524; já saiu da base em 07/11, fica aqui só como trava
+  precos: dados/precos/minuto_janela_ataques.csv.gz
+
+modelo:
+  car_pre: [-10, 0]            # faixa da CAR pré (descritiva)
+  velas_tabela: [1, 2, 5, 10, 15, 30, 60, 180]
+  vela_venda: 2                # vale e meia-vida contam a partir daqui (índice h = vela − 1)
+  minutos_seguidos: 3
+  bootstrap:
+    replicas: 1000
+    nivel_ic: 0.90
+    seed: 20261107
+
+llm:
+  scores: dados/llm/scores.csv  # event_id, gravidade (1–5), n_rodadas — gerado por scripts/03_score_llm.py
+  modelo: claude-opus-5-5
+  rodadas: 1                    # decisão do grupo (07/11): 1 rodada por notícia; a especificação pedia 3 a 5
+  seed_simulados: 42            # só se scores.csv não existir: score sorteado de 1 a 5
+
+janela:
+  minutos_antes: 180            # vela −180 ...
+  minutos_depois: 180           # ... até a vela +180
+
+retorno_normal:
+  # Decidido em 07/11: termina 1h antes do anúncio. Nos dados de treino a queda pré-anúncio
+  # começa antes de −11; com [−180, −11] o μ absorvia parte dela e encolhia a CAR.
+  inicio: -180
+  fim: -61
+
+placebo:
+  # Placebo A: mesma hora, 1 semana antes. Se essa janela cruza a de outro ataque, tenta
+  # 2, 3 e 4 semanas antes, nessa ordem. Sem opção válida, o ataque fica sem placebo.
+  semanas_antes: [1, 2, 3, 4]
+  distancia_min_horas: 6        # centro do placebo a ≥ 6h de qualquer anúncio: as janelas de ±3h não se tocam
+  arquivo: dados/placebo/minuto_janela_placebo.csv.gz
+  pasta_brutos: dados/placebo/brutos   # zips diários da Binance (fora do Git)

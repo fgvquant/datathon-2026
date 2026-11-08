@@ -5,13 +5,13 @@ Fonte: https://data.binance.vision (arquivo público do spot, pares contra USDT,
   data/spot/daily/klines/{PAR}/1m/    arquivos diários, que existem desde 2021-03-01
   data/spot/monthly/klines/{PAR}/1m/  arquivos mensais, usados quando não há diário
 
-Entrada: dados_tratados/anuncios_197_ataques.xlsx (timestamp_utc dos 197 ataques com tweet)
+Entrada: dados/eventos/coleta_tweets_ataques.xlsx (timestamp_utc dos 196 ataques com tweet)
 
 Saídas:
-  dados_brutos/binance_spot_1m/{PAR}/*.zip          zips originais, conferidos pelo .CHECKSUM (SHA-256)
-  dados_tratados/minuto_janela_ataques.csv          uma linha por ataque x moeda x minuto
-  dados_tratados/minuto_cobertura_moedas.csv        por moeda: velas esperadas, ausentes e minutos sem negócio
-  dados_tratados/minuto_falhas.csv                  arquivos que falharam (vazio = tudo certo)
+  dados/precos/brutos/{PAR}/*.zip                   zips originais, conferidos pelo .CHECKSUM (SHA-256)
+  dados/precos/minuto_janela_ataques.csv          uma linha por ataque x moeda x minuto
+  dados/precos/minuto_cobertura_moedas.csv        por moeda: velas esperadas, ausentes e minutos sem negócio
+  dados/precos/minuto_falhas.csv                  arquivos que falharam (vazio = tudo certo)
 
 Regras:
   - minuto_relativo 0 é a vela que contém o horário da planilha: ela abre antes do anúncio e fecha depois.
@@ -20,14 +20,16 @@ Regras:
   - Minuto com vela e sem negócio fica com sem_negocio = True.
 
 Usa o curl do sistema. Se cair no meio, é só rodar de novo: o que já foi baixado é pulado.
-Como rodar (na pasta do projeto):  python codigo/13_baixar_minuto_janela_ataques.py
+Como rodar (na pasta do projeto):  python scripts/01_baixa_janelas_ataques.py
 """
 import hashlib, io, os, subprocess, zipfile
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # caminhos relativos à raiz do repositório
+
 BASE = 'https://data.binance.vision/data/spot'
-PASTA = 'dados_brutos/binance_spot_1m'
+PASTA = 'dados/precos/brutos'
 MOEDAS = ['BTC', 'ETH', 'XRP', 'BNB', 'ADA', 'LINK', 'XLM', 'TRX', 'LTC', 'BCH']
 MIN_ANTES, MIN_DEPOIS = 180, 180
 INICIO_DIARIO = pd.Timestamp('2021-03-01')
@@ -82,7 +84,7 @@ def le_zip(arq):
 
 
 # ---- horários
-t = pd.read_excel('dados_tratados/anuncios_197_ataques.xlsx', sheet_name='coleta', dtype=str)
+t = pd.read_excel('dados/eventos/coleta_tweets_ataques.xlsx', sheet_name='coleta', dtype=str)
 t = t[t.timestamp_utc.notna()][['event_id', 'timestamp_utc']].rename(columns={'timestamp_utc': 'hora_referencia_utc'})
 t['ref'] = pd.to_datetime(t.hora_referencia_utc)
 t['minuto_zero'] = t.ref.dt.floor('min')
@@ -109,7 +111,7 @@ print(f'{len(tarefas)} dias de moeda', flush=True)
 with ThreadPoolExecutor(max_workers=8) as ex:
     res = list(ex.map(pega, tarefas))
 falhas = [(p, f'{d:%Y-%m-%d}', e) for p, d, c, e in res if c is None]
-pd.DataFrame(falhas, columns=['par', 'dia', 'erro']).to_csv('dados_tratados/minuto_falhas.csv', index=False)
+pd.DataFrame(falhas, columns=['par', 'dia', 'erro']).to_csv('dados/precos/minuto_falhas.csv', index=False)
 print(f'download pronto, {len(falhas)} falhas', flush=True)
 
 # ---- leitura
@@ -131,7 +133,7 @@ s = s.rename(columns={'minuto': 'hora_utc'}).sort_values(['event_id', 'moeda', '
 s['hora_utc'] = s.hora_utc.dt.strftime('%Y-%m-%d %H:%M:%S')
 ordem = ['event_id', 'hora_referencia_utc', 'moeda', 'par', 'minuto_relativo', 'hora_utc', 'open', 'high', 'low', 'close', 'volume', 'quote_volume', 'n_trades',
          'taker_buy_base', 'taker_buy_quote', 'vela_ausente', 'sem_negocio']
-s[ordem].to_csv('dados_tratados/minuto_janela_ataques.csv', index=False, encoding='utf-8')
+s[ordem].to_csv('dados/precos/minuto_janela_ataques.csv', index=False, encoding='utf-8')
 
 # ---- cobertura
 s['com_negocio'] = ~s.vela_ausente & ~s.sem_negocio
@@ -139,6 +141,6 @@ c = s.groupby('moeda', sort=False).agg(velas_esperadas=('open', 'size'), velas_a
 c['parte_com_negocio'] = s.groupby('moeda').com_negocio.mean()
 c['primeiro_dia'] = s[~s.vela_ausente].groupby('moeda').hora_utc.min().str[:10]
 c = c.reindex(MOEDAS).reset_index()
-c.to_csv('dados_tratados/minuto_cobertura_moedas.csv', index=False, encoding='utf-8')
+c.to_csv('dados/precos/minuto_cobertura_moedas.csv', index=False, encoding='utf-8')
 print(c.to_string(index=False))
 print(f'Pronto: {s.event_id.nunique()} ataques, {len(MOEDAS)} moedas, {len(s)} linhas')
