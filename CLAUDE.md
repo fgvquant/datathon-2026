@@ -108,8 +108,13 @@ Modelo com score (H2):    CAR_{e,i}(h) = a_i(h) + b_i(h) (g_e − ḡ) + ε_{e,i
   moeda (quando cai). Robustez opcional: regressão do AR de cada moeda no AR defasado do BTC.
 - **Entrega do modelo base:** tabela por moeda com CAR_pre, CR nas velas **+1, +2, +5, +10, +15, +30, +60 e +180**,
   minuto do vale e meia-vida, cada um com IC, ao lado do placebo; e um gráfico da curva CR completa por moeda, com IC.
-- **Entrega do modelo com score:** `b_i(h)` por moeda nas mesmas velas, com IC; curvas `CR(·; g)` para g = 1..5;
-  vale e meia-vida por score.
+- **Entrega do modelo com score:** principal = `b(h)` comum às moedas (item abaixo), curvas `CR(·; g)` para g = 1..5
+  (`score_comum_curvas.csv`, a que o backtest usa) e vale e meia-vida por score. Robustez/apêndice = `b_i(h)` por moeda
+  nas mesmas velas, com IC (`score_*`), para mostrar que o efeito do score não difere entre as moedas.
+- **Teste de H2 (decidido em 08/11):** `b(h)` **comum às 10 moedas** (intercepto `a_i(h)` por moeda; com painel
+  balanceado, é a média dos `b_i`), testado só nas velas `modelo.velas_teste_score` (+10, +30, +60). IC de 90% simples,
+  sem Bonferroni; o relatório diz que são 3 testes. Robustez: o mesmo `b` comum por Huber (RLM empilhado, `huber_t`).
+  Saídas `score_comum_*`.
 
 **Robustez (não é o modelo principal):**
 - **Modelo de mercado:** `AR = r − (α + β r_m)`, com α e β estimados em [−180, −61]. Cuidado: se o mercado inteiro

@@ -203,6 +203,15 @@ Regras:
 3; só um ataque tem nota 5, então a curva de g = 5 é extrapolada pela reta e tem intervalo muito largo. Se o arquivo
 sumir, o modelo volta a sortear notas e marca tudo com `_SIMULADO` no nome; esses números não vão para os slides.
 
+**Teste de H2 com 3 testes (decidido em 08/11).** Estimar um `b` por moeda e por vela gerava 80 testes, e 2 com IC fora
+do zero é o que se espera ao acaso. Agora a inclinação é **comum às 10 moedas**, com o intercepto `a_i(h)` por moeda,
+e é testada só nas velas +10, +30 e +60, escolhidas antes de rodar. O IC é o de 90% simples, sem Bonferroni, e o
+relatório diz que são 3 testes. Com o painel balanceado, esse `b` comum é exatamente a média dos `b_i`. Como
+robustez, o mesmo `b` comum é estimado por **Huber**: a regressão continua igual, mas resíduos grandes passam a pesar
+de forma linear, e não ao quadrado, então poucos ataques extremos não decidem o sinal. Resultado em
+`score_comum_teste.csv`: nas 3 velas, o IC do MQO e o do Huber contêm o zero, e o Huber fica bem mais perto de zero
+(+0,5, −0,7 e −1,2 pb por ponto de nota). O score continua sem explicar a CAR.
+
 ## 1.10 Testes de robustez
 
 - **Modelo de mercado:** em vez da média da janela, o retorno normal vem de uma regressão da moeda no mercado,
