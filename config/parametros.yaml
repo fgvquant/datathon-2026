@@ -42,3 +42,16 @@ placebo:
   distancia_min_horas: 6        # centro do placebo a ≥ 6h de qualquer anúncio: as janelas de ±3h não se tocam
   arquivo: dados/placebo/minuto_janela_placebo.csv.gz
   pasta_brutos: dados/placebo/brutos   # zips diários da Binance (fora do Git)
+
+backtest:
+  # Seção 7. Todas as combinações abaixo rodam o backtest inteiro (regra 4); o Sharpe deflacionado conta todas.
+  velas_venda: [2, 1, 5, 10]    # base: vela +2
+  saidas: [meia_vida, vale]     # decisão em aberto: o relatório mostra as duas
+  treinos: [fixo, expansivo]    # fixo = só 2020–2025; expansivo = + ataques de 2026 já encerrados (+180) antes do operado
+  carteiras_usd: [100000, 1000000, 10000000]
+  fracao_volume: 0.10           # ordem ≤ 10% do volume (USDT) da vela de venda e da de recompra
+  custos:                       # pb por lado = taxa + spread/2 + impacto. CONFIRMAR a taxa spot da Binance
+    binance: {taxa_pb: 10, spread_pb: 2, impacto_pb: 2}
+    sem_custo: {taxa_pb: 0, spread_pb: 0, impacto_pb: 0}
+  principal: {vela_venda: 2, treino: fixo, carteira_usd: 1000000, custo: binance}
+  pesos: dados/cci10/cci10_pesos_diarios.csv   # usa o peso do dia anterior ao ataque (conhecido antes dele)

@@ -14,22 +14,23 @@ import pandas as pd
 T0 = -180  # primeira vela da janela
 
 
-def carrega_janelas(caminho):
+def carrega_janelas(caminho, coluna="close"):
     """Lê minuto_janela_ataques.csv(.gz) ou minuto_janela_placebo.csv.gz.
 
-    Sai: close [E, I, 361] (preço de fechamento), eventos (DataFrame com event_id e hora_referencia_utc, na ordem
+    coluna = "close" (padrão) ou outra coluna da base, ex. "quote_volume" (volume em USDT).
+    Sai: close [E, I, 361] (a coluna pedida), eventos (DataFrame com event_id e hora_referencia_utc, na ordem
     de close) e moedas (lista, na ordem de close). Falha se faltar vela ou se houver preço ≤ 0 ou duplicata.
     """
-    df = pd.read_csv(caminho, usecols=["event_id", "hora_referencia_utc", "moeda", "minuto_relativo", "close"])
+    df = pd.read_csv(caminho, usecols=["event_id", "hora_referencia_utc", "moeda", "minuto_relativo", coluna])
     if df.duplicated(["event_id", "moeda", "minuto_relativo"]).any():
         raise ValueError(f"{caminho}: linhas repetidas")
-    if (df.close <= 0).any():
+    if coluna == "close" and (df.close <= 0).any():
         raise ValueError(f"{caminho}: preço ≤ 0")
     eventos = df.drop_duplicates("event_id")[["event_id", "hora_referencia_utc"]].sort_values("event_id")
     eventos["hora_referencia_utc"] = pd.to_datetime(eventos.hora_referencia_utc)
     moedas = sorted(df.moeda.unique())
     grade = pd.MultiIndex.from_product([eventos.event_id, moedas, range(-180, 181)])
-    s = df.set_index(["event_id", "moeda", "minuto_relativo"]).close.reindex(grade)
+    s = df.set_index(["event_id", "moeda", "minuto_relativo"])[coluna].reindex(grade)
     if s.isna().any():
         raise ValueError(f"{caminho}: {s.isna().sum()} velas faltando")
     return s.to_numpy().reshape(len(eventos), len(moedas), 361), eventos.reset_index(drop=True), moedas
