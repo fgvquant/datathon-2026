@@ -20,3 +20,4 @@ venv/
 ~$*.xlsx
 dados/precos/minuto_janela_ataques.csv
 dados/placebo/brutos/
+dados/precos/brutos/

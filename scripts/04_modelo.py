@@ -1,7 +1,7 @@
 """Event study: modelo base (H1) e modelo com score (H2) nos ataques de estimação (2020–2025), com placebo.
 
 Rode da raiz do repositório:
-    python scripts/02_modelo.py [--config config/parametros.yaml]
+    python scripts/04_modelo.py [--config config/parametros.yaml]
 
 Saída em results/<nome do config>/:
   base_tabela.csv      por moeda: CAR_pre, CR nas velas da tabela, vale e meia-vida (vela), com IC; ataque e placebo

@@ -16,8 +16,10 @@ modelo:
     seed: 20261107
 
 llm:
-  scores: dados/llm/scores.csv  # event_id, gravidade (1–5), n_rodadas
-  seed_simulados: 42            # enquanto scores.csv não existir: score sorteado de 1 a 5
+  scores: dados/llm/scores.csv  # event_id, gravidade (1–5), n_rodadas — gerado por scripts/03_score_llm.py
+  modelo: claude-opus-5-5
+  rodadas: 1                    # a leva de 07/11 fez 1 rodada por notícia; a especificação pede 3 a 5 (decisão do grupo)
+  seed_simulados: 42            # só se scores.csv não existir: score sorteado de 1 a 5
 
 janela:
   minutos_antes: 180            # vela −180 ...

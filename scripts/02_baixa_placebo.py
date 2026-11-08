@@ -1,7 +1,7 @@
 """Baixa as janelas placebo (placebo A) da Binance spot, velas de 1 min.
 
 Rode da raiz do repositório:
-    python scripts/01_baixa_placebo.py
+    python scripts/02_baixa_placebo.py
 
 Entrada: dados/eventos/coleta_tweets_ataques.xlsx (timestamp_utc) e config/parametros.yaml (placebo).
 Saída:   dados/placebo/minuto_janela_placebo.csv.gz, no formato de minuto_janela_ataques.csv mais a

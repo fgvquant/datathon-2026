@@ -6,9 +6,9 @@ Todas as bases ficam aqui, organizadas por tipo. Horários sempre em UTC.
 | --- | --- | --- | --- |
 | `eventos/` | `coleta_tweets_ataques.xlsx` | primeiro anúncio de cada ataque | 197 ataques, todos com horário (recorte da v19; a v19 completa, com 583, está no histórico do Git) |
 | `precos/` | `minuto_janela_ataques.csv` | velas de 1 min, ±3h em torno de cada anúncio, 10 moedas | completo para os 197 ataques; versionado como `.csv.gz` |
-| `placebo/` | `minuto_janela_placebo.csv.gz` | mesmo formato mais `semanas_antes`: mesma hora, 1 semana antes de cada ataque (2–4 se a janela cruzar outro ataque) | gerado por `scripts/01_baixa_placebo.py` |
+| `placebo/` | `minuto_janela_placebo.csv.gz` | mesmo formato mais `semanas_antes`: mesma hora, 1 semana antes de cada ataque (2–4 se a janela cruzar outro ataque) | gerado por `scripts/02_baixa_placebo.py` |
 | `cci10/` | série diária do CCI10 | pesos do benchmark | com um integrante do grupo |
-| `llm/` | `scores.csv` | `event_id`, `gravidade` (1–5, mediana das rodadas), `n_rodadas` | gerado fora deste repositório |
+| `llm/` | `scores.csv` | `event_id`, `gravidade` (1–5, mediana das rodadas), `n_rodadas` | gerado por `scripts/03_score_llm.py` a partir de `respostas.jsonl` (régua em `regua_llm.txt`) |
 
 Ao atualizar uma base, troque o arquivo e mude a versão no nome (ex.: `v19` → `v20`). Não edite à mão uma base
 gerada por código.
