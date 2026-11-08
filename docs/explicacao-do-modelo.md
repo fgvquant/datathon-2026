@@ -42,7 +42,8 @@ Imagine que medimos uma queda média de 15 pb depois dos ataques. Isso pode ter 
 3. aqueles horários do dia costumam ser ruins.
 
 O **placebo** separa o motivo 1 dos outros dois. Para cada ataque, pegamos o **mesmo dia da semana e o mesmo
-horário, 7 dias antes**, quando não houve ataque, e fazemos **exatamente a mesma conta**.
+horário, 7 dias antes**, quando não houve ataque, e fazemos **exatamente a mesma conta**. Se essa janela cai em
+cima de outro ataque (6 casos), usamos 2 semanas antes (ou 3, ou 4).
 
 - Se o placebo também cai 15 pb, a queda não tem nada a ver com o ataque.
 - Se o placebo dá perto de zero e o ataque dá −15 pb, a queda é do ataque.
@@ -94,8 +95,10 @@ retorno anormal = retorno do minuto − retorno normal
 ### Passo 1 — Retorno normal
 
 Cada janela tem o seu "clima": num dia o mercado estava subindo, em outro caindo. O **retorno normal** é a média dos
-retornos da própria janela entre o minuto −180 e o −11, longe do anúncio. A faixa de −10 a −1 fica de fora porque o
-ataque já está acontecendo na blockchain e a notícia pode vazar antes do tweet.
+retornos da própria janela entre o minuto −180 e o −61, longe do anúncio. A última hora antes do tweet fica de fora
+porque o ataque já está acontecendo na blockchain e a notícia pode vazar antes: nos dados de treino a queda começa
+antes do minuto −11. Se essa queda entrasse no "normal", o modelo acharia que cair é normal e atribuiria ao ataque
+só parte da queda depois do tweet.
 
 ### Passo 2 — Retorno anormal (AR)
 
@@ -204,7 +207,7 @@ desde já.
 ## 1.10 Testes de robustez
 
 - **Modelo de mercado:** em vez da média da janela, o retorno normal vem de uma regressão da moeda no mercado,
-  estimada em −180 a −11. Cuidado: se o mercado inteiro cai com o ataque, descontar o mercado tira parte do efeito.
+  estimada em −180 a −61. Cuidado: se o mercado inteiro cai com o ataque, descontar o mercado tira parte do efeito.
 - **VAR-X com faixas** (o modelo anterior): estima os padrões normais de um minuto para o outro e o efeito do
   ataque por faixa. Se a curva dele ficar parecida com a do event study, o resultado fica mais forte.
 - **Sem os pares de ataques próximos** e **sem os casos duvidosos** da base (seção 3 do CLAUDE.md).
@@ -248,13 +251,13 @@ Leitura:
 | Leitura dos "3 minutos seguidos" no vale | início do bloco de 3 minutos com o fundo mais baixo |
 | Saída base: vale ou meia-vida | os dois são calculados; a meia-vida é mais estável |
 | Modelo principal | event study com CAR; VAR-X com faixas só como robustez (decidido em 07/11) |
-| Janela do retorno normal | −180 a −11 (congelar antes do backtest) |
+| Janela do retorno normal | −180 a −61 (decidido em 07/11; congelada antes do backtest) |
 | Início da negociação | 01/01/2026 (45 ataques) |
 
 ## Dados
 
 - [ ] **Notas reais do LLM** (`dados/llm/scores.csv`, colunas `event_id`, `gravidade`, `n_rodadas`).
-- [ ] **Janelas placebo** (mesmo formato dos ataques, 7 dias antes).
+- [x] **Janelas placebo** (mesmo formato dos ataques, 7 dias antes): `scripts/01_baixa_placebo.py`.
 
 ## Modelo
 
