@@ -1,15 +1,16 @@
 """
 Monta a base por minuto das 10 maiores moedas em volta de cada ataque: 3 horas antes e 3 horas depois do horário da planilha.
 
-Fonte: https://data.binance.vision (arquivo público do spot, pares contra USDT, velas de 1 minuto)
-  data/spot/daily/klines/{PAR}/1m/    arquivos diários, que existem desde 2021-03-01
-  data/spot/monthly/klines/{PAR}/1m/  arquivos mensais, usados quando não há diário
+Fonte: https://data.binance.vision (spot, pares contra USDT, velas de 1 minuto)
+  A Binance distribui as mesmas velas de 1 minuto em dois tamanhos de arquivo:
+  data/spot/daily/klines/{PAR}/1m/    um zip por dia   — usado a partir de 2021-03-01
+  data/spot/monthly/klines/{PAR}/1m/  um zip por mês   — usado antes disso ou se faltar o zip do dia
 
 Entrada: dados/eventos/coleta_tweets_ataques.xlsx (timestamp_utc dos 196 ataques com tweet)
 
 Saídas:
   dados/precos/brutos/{PAR}/*.zip                   zips originais, conferidos pelo .CHECKSUM (SHA-256)
-  dados/precos/minuto_janela_ataques.csv          uma linha por ataque x moeda x minuto
+  dados/precos/minuto_janela_ataques.csv.gz       uma linha por ataque x moeda x minuto, já compactado (é o que o modelo lê)
   dados/precos/minuto_cobertura_moedas.csv        por moeda: velas esperadas, ausentes e minutos sem negócio
   dados/precos/minuto_falhas.csv                  arquivos que falharam (vazio = tudo certo)
 
@@ -133,7 +134,7 @@ s = s.rename(columns={'minuto': 'hora_utc'}).sort_values(['event_id', 'moeda', '
 s['hora_utc'] = s.hora_utc.dt.strftime('%Y-%m-%d %H:%M:%S')
 ordem = ['event_id', 'hora_referencia_utc', 'moeda', 'par', 'minuto_relativo', 'hora_utc', 'open', 'high', 'low', 'close', 'volume', 'quote_volume', 'n_trades',
          'taker_buy_base', 'taker_buy_quote', 'vela_ausente', 'sem_negocio']
-s[ordem].to_csv('dados/precos/minuto_janela_ataques.csv', index=False, encoding='utf-8')
+s[ordem].to_csv('dados/precos/minuto_janela_ataques.csv.gz', index=False, encoding='utf-8')  # o .gz no nome faz o pandas compactar
 
 # ---- cobertura
 s['com_negocio'] = ~s.vela_ausente & ~s.sem_negocio
