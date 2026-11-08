@@ -8,6 +8,8 @@ Saída em results/<nome do config>/:
   base_curvas.csv      CR(h) por moeda e vela, com IC; ataque e placebo
   base_curvas.png      gráfico das curvas
   score_b[_SIMULADO].csv, score_curvas[_SIMULADO].csv, score_vale_meia_vida[_SIMULADO].csv, score_curvas[_SIMULADO].png
+  score_comum_*        os mesmos quatro arquivos com b comum às 10 moedas
+  score_comum_teste.csv  teste de H2: b comum nas velas_teste_score, MQO e Huber, com IC
 """
 import argparse
 import sys
@@ -24,8 +26,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
-from src.modelo import (calcula_car, carrega_janelas, intervalo, media_ponderada, pesos_bootstrap,  # noqa: E402
-                        regressao_score, vale_meia_vida)
+from src.modelo import (b_comum_huber, calcula_car, carrega_janelas, inclinacao_comum, intervalo,  # noqa: E402
+                        media_ponderada, pesos_bootstrap, regressao_score, vale_meia_vida)
 
 AZUL, LARANJA, TINTA, MUDO, GRADE = "#2a78d6", "#eb6834", "#1f1f1e", "#898781", "#e1e0d9"
 RAMPA_SCORE = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"]  # g = 1..5, claro → escuro
@@ -145,31 +147,52 @@ def main(argv=None):
     g_todos, simulado = le_scores(eventos, cfg)
     g = g_todos[est]
     sufixo = "_SIMULADO" if simulado else ""
-    a_, b_, gbar = regressao_score(r["car"], g)
-    a_rep, b_rep, gbar_rep = regressao_score(r["car"], g, pesos)
+    a_, b_moeda, gbar = regressao_score(r["car"], g)
+    a_rep, b_moeda_rep, gbar_rep = regressao_score(r["car"], g, pesos)
 
-    lo, hi = intervalo(b_rep, b["nivel_ic"])
-    pd.DataFrame([{"moeda": moeda, "vela": v, "b": b_[k, v - 1], "ic_inf": lo[k, v - 1], "ic_sup": hi[k, v - 1]}
-                  for k, moeda in enumerate(moedas) for v in m["velas_tabela"]]
-                 ).to_csv(saida / f"score_b{sufixo}.csv", index=False, float_format="%.3f")
+    # "por_moeda": um b_i(h) por moeda (score_*); "comum": b(h) igual nas 10 moedas (score_comum_*), seção 4
+    for variante, pre in (("por_moeda", "score"), ("comum", "score_comum")):
+        b_, b_rep = ((b_moeda, b_moeda_rep) if variante == "por_moeda"
+                     else (inclinacao_comum(b_moeda), inclinacao_comum(b_moeda_rep)))
+        lo, hi = intervalo(b_rep, b["nivel_ic"])
+        pd.DataFrame([{"moeda": moeda, "vela": v, "b": b_[k, v - 1], "ic_inf": lo[k, v - 1], "ic_sup": hi[k, v - 1]}
+                      for k, moeda in enumerate(moedas) for v in m["velas_tabela"]]
+                     ).to_csv(saida / f"{pre}_b{sufixo}.csv", index=False, float_format="%.3f")
 
-    curvas_g, vm = [], []
-    for nota in range(1, 6):
-        crg = a_ + b_ * (nota - gbar)
-        crg_rep = a_rep + b_rep * (nota - gbar_rep)[:, None, None]
-        curvas_g.append(curvas_longas(crg, intervalo(crg_rep, b["nivel_ic"]), moedas, serie=nota))
-        for nome, i in (("vela_vale", 0), ("vela_meia_vida", 1)):
-            est_ = vale_meia_vida(crg, m["vela_venda"] - 1, m["minutos_seguidos"])[i] + 1
-            lo_, hi_ = intervalo(vale_meia_vida(crg_rep, m["vela_venda"] - 1, m["minutos_seguidos"])[i] + 1,
-                                 b["nivel_ic"])
-            vm += [{"moeda": moeda, "score": nota, "estatistica": nome, "estimativa": est_[k],
-                    "ic_inf": lo_[k], "ic_sup": hi_[k]} for k, moeda in enumerate(moedas)]
-    curvas_g = pd.concat(curvas_g)
-    curvas_g.to_csv(saida / f"score_curvas{sufixo}.csv", index=False, float_format="%.3f")
-    pd.DataFrame(vm).to_csv(saida / f"score_vale_meia_vida{sufixo}.csv", index=False, float_format="%.1f")
-    grafico(curvas_g, moedas, f"CR(h; g) por score{' — SCORES SIMULADOS' if simulado else ''} "
-            f"(ḡ = {gbar:.2f}; IC só em g = 1 e 5)", saida / f"score_curvas{sufixo}.png",
-            lambda s: RAMPA_SCORE[s - 1], lambda s: f"g = {s}", lambda s: s in (1, 5))
+        curvas_g, vm = [], []
+        for nota in range(1, 6):
+            crg = a_ + b_ * (nota - gbar)
+            crg_rep = a_rep + b_rep * (nota - gbar_rep)[:, None, None]
+            curvas_g.append(curvas_longas(crg, intervalo(crg_rep, b["nivel_ic"]), moedas, serie=nota))
+            for nome, i in (("vela_vale", 0), ("vela_meia_vida", 1)):
+                est_ = vale_meia_vida(crg, m["vela_venda"] - 1, m["minutos_seguidos"])[i] + 1
+                lo_, hi_ = intervalo(vale_meia_vida(crg_rep, m["vela_venda"] - 1, m["minutos_seguidos"])[i] + 1,
+                                     b["nivel_ic"])
+                vm += [{"moeda": moeda, "score": nota, "estatistica": nome, "estimativa": est_[k],
+                        "ic_inf": lo_[k], "ic_sup": hi_[k]} for k, moeda in enumerate(moedas)]
+        curvas_g = pd.concat(curvas_g)
+        curvas_g.to_csv(saida / f"{pre}_curvas{sufixo}.csv", index=False, float_format="%.3f")
+        pd.DataFrame(vm).to_csv(saida / f"{pre}_vale_meia_vida{sufixo}.csv", index=False, float_format="%.1f")
+        grafico(curvas_g, moedas, f"CR(h; g) por score, b {variante.replace('_', ' ')}"
+                f"{' — SCORES SIMULADOS' if simulado else ''} (ḡ = {gbar:.2f}; IC só em g = 1 e 5)",
+                saida / f"{pre}_curvas{sufixo}.png",
+                lambda s: RAMPA_SCORE[s - 1], lambda s: f"g = {s}", lambda s: s in (1, 5))
+
+    # ---------- teste de H2: b comum em 3 velas, MQO e Huber, IC simples ----------
+    b_c, b_c_rep = inclinacao_comum(b_moeda)[0], inclinacao_comum(b_moeda_rep)[:, 0]   # [H] e [R, H]
+    teste = []
+    for v in m["velas_teste_score"]:
+        lo, hi = intervalo(b_c_rep[:, v - 1], b["nivel_ic"])
+        teste.append({"vela": v, "metodo": "MQO", "b": b_c[v - 1], "ic_inf": lo, "ic_sup": hi})
+        car_v = r["car"][:, :, v - 1]
+        lo, hi = intervalo(b_comum_huber(car_v, g, pesos, m["huber_t"]), b["nivel_ic"])
+        teste.append({"vela": v, "metodo": "Huber", "b": b_comum_huber(car_v, g, t=m["huber_t"]),
+                      "ic_inf": lo, "ic_sup": hi})
+    teste = pd.DataFrame(teste)
+    teste.to_csv(saida / f"score_comum_teste{sufixo}.csv", index=False, float_format="%.3f")
+    print(f"\n=== H2: b comum às moedas (pb por ponto de score){' — SIMULADO' if simulado else ''} ===")
+    print(f"{len(m['velas_teste_score'])} testes, IC {b['nivel_ic']:.0%} percentil sem correção")
+    print(teste.to_string(index=False, float_format=lambda x: f"{x:7.2f}"))
 
     print(f"\nModelo com score{' (SIMULADO)' if simulado else ''}: ḡ = {gbar:.2f}. Saídas em {saida.relative_to(RAIZ)}")
 
