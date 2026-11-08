@@ -199,10 +199,9 @@ Regras:
 - A relação é **linear**: cada ponto de nota vale o mesmo. Uma regressão por nota evitaria isso, mas sobrariam ~30
   ataques de treino por nota, o que é pouco.
 
-**Hoje as notas são SORTEADAS.** O arquivo com as notas reais (`dados/llm/scores.csv`) ainda não chegou. Enquanto
-isso, o modelo com score roda com notas sorteadas de 1 a 5, e tudo o que sai dele leva `_SIMULADO` no nome.
-**Esses números não significam nada e não podem ir para os slides.** O modelo base não usa nota nenhuma e vale
-desde já.
+**As notas reais chegaram em 07/11** (`dados/llm/scores.csv`, 1 rodada por notícia). Quase todas ficam entre 2 e
+3; só um ataque tem nota 5, então a curva de g = 5 é extrapolada pela reta e tem intervalo muito largo. Se o arquivo
+sumir, o modelo volta a sortear notas e marca tudo com `_SIMULADO` no nome; esses números não vão para os slides.
 
 ## 1.10 Testes de robustez
 
@@ -256,8 +255,8 @@ Leitura:
 
 ## Dados
 
-- [ ] **Notas reais do LLM** (`dados/llm/scores.csv`, colunas `event_id`, `gravidade`, `n_rodadas`).
-- [x] **Janelas placebo** (mesmo formato dos ataques, 7 dias antes): `scripts/01_baixa_placebo.py`.
+- [x] **Notas reais do LLM** (`dados/llm/scores.csv`, 1 rodada; falta decidir se rodam 3 a 5).
+- [x] **Janelas placebo** (mesmo formato dos ataques, 7 dias antes): `scripts/02_baixa_placebo.py`.
 
 ## Modelo
 
