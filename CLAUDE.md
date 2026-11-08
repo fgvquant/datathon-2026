@@ -165,7 +165,7 @@ h_1/2  = min{ h ≥ h_e : CR(h; g) − CR(h_vale; g) ≤ 0,5 [CR(h_e; g) − CR(
   regra de saída e custos.
 - **Regra:** com `CR(·; g_e)` do treino, vender a moeda i se
   `−[CR_i(h_recompra; g_e) − CR_i(h_venda; g_e)] > custo de ida e volta`.
-- **Venda** na vela +2 (testar +1, +5, +10). **Recompra** no vale ou na meia-vida da moeda (config).
+- **Venda** na vela +2 (testar +1, +5, +10). **Recompra** na meia-vida da moeda (decidido em 08/11).
 - **Prêmio** de cada ataque e retorno da estratégia (pesos diários de `dados/cci10/cci10_pesos_diarios.csv`):
 
 ```
@@ -235,6 +235,6 @@ R_e(estratégia) = R_e(CCI10) + π_e
 - [x] ~~Modelo principal~~ → event study com CAR; VAR-X com faixas vira robustez (07/11).
 - [x] ~~Janela de negociação~~ → ataques de 2026; treino = 2020–2025 (07/11).
 - [ ] Treino fixo (só 2020–2025) ou expansivo ao longo de 2026 no backtest.
-- [ ] Saída base: vale ou meia-vida.
+- [x] ~~Saída base: vale ou meia-vida~~ → só meia-vida; o vale fica descritivo no modelo (08/11).
 - [ ] Taxa spot da Binance em cada período.
 - [ ] Divisão do código: quem faz modelo e backtest (o LLM/score já tem dono).

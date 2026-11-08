@@ -46,7 +46,7 @@ placebo:
 backtest:
   # Seção 7. Todas as combinações abaixo rodam o backtest inteiro (regra 4); o Sharpe deflacionado conta todas.
   velas_venda: [2, 1, 5, 10]    # base: vela +2
-  saidas: [meia_vida, vale]     # decisão em aberto: o relatório mostra as duas
+  saidas: [meia_vida]           # decidido em 08/11: recompra só na meia-vida
   treinos: [fixo, expansivo]    # fixo = só 2020–2025; expansivo = + ataques de 2026 já encerrados (+180) antes do operado
   carteiras_usd: [100000, 1000000, 10000000]
   fracao_volume: 0.10           # ordem ≤ 10% do volume (USDT) da vela de venda e da de recompra
