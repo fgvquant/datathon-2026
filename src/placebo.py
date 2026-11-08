@@ -60,20 +60,12 @@ def monta_janela(velas, referencia, antes=180, depois=180):
 
     Entra: velas = saída de le_klines (pode juntar vários dias); referencia = datetime UTC.
     Sai:   lista de (minuto_relativo, hora_da_vela, campos, vela_ausente), com antes+depois+1 itens.
-    Vela que a Binance não tem: OHLC = último close (ou o próximo, se faltar no início), volumes 0.
+    Vela que a Binance não tem: preços e volumes vazios e vela_ausente = True. Nada é preenchido
+    (como no 01): assim src.modelo.carrega_janelas para com erro se a base tiver buraco.
     """
     m0 = referencia.replace(second=0, microsecond=0)
     horas = [(t, m0 + timedelta(minutes=t)) for t in range(-antes, depois + 1)]
-    # começa com o primeiro close da janela, para o caso de faltar a vela −180
-    c = next((velas[h][3] for _, h in horas if h in velas), None)
-    if c is None:
+    if not any(h in velas for _, h in horas):
         raise ValueError(f"nenhuma vela na janela de {referencia}")
-    saida = []
-    for t, h in horas:
-        v = velas.get(h)
-        if v is None:
-            saida.append((t, h, [c, c, c, c, "0", "0", "0", "0", "0"], True))
-        else:
-            c = v[3]
-            saida.append((t, h, v, False))
-    return saida
+    vazia = [""] * len(CAMPOS_VELA)
+    return [(t, h, velas[h], False) if h in velas else (t, h, vazia, True) for t, h in horas]

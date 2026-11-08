@@ -5,6 +5,8 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.placebo import escolhe_horarios, le_klines, monta_janela  # noqa: E402
@@ -41,13 +43,19 @@ def test_le_klines_ms_e_us():
         assert le_klines(_zip([[ts, *base]]))[t] == ["1", "2", "0.5", "1.5", "10", "20", "3", "4", "5"]
 
 
-def test_janela_tem_361_velas_e_preenche_ausentes():
+def test_janela_tem_361_velas_e_nao_preenche_ausentes():
     ref = datetime(2024, 3, 20, 14, 3, 27)
     m0 = datetime(2024, 3, 20, 14, 3)
     velas = {m0 + timedelta(minutes=t): ["1", "1", "1", str(100 + t), "5", "5", "1", "1", "1"]
              for t in range(-180, 181) if t not in (-180, 7)}
     j = monta_janela(velas, ref)
     assert len(j) == 361 and j[180][:2] == (0, m0)
-    assert j[0][2][3] == "-79" and j[0][3]           # −180 ausente: usa o primeiro close (vela −179)
-    assert j[187][2][:4] == ["106"] * 4 and j[187][3]  # +7 ausente: usa o close da +6
-    assert j[187][2][4] == "0"
+    for i in (0, 187):                                 # velas −180 e +7 ausentes: tudo vazio e marcado
+        assert j[i][2] == [""] * 9 and j[i][3]
+    assert j[186][2][3] == "106" and not j[186][3]     # a +6 existe e vem como está
+    assert sum(x[3] for x in j) == 2
+
+
+def test_janela_sem_nenhuma_vela_da_erro():
+    with pytest.raises(ValueError):
+        monta_janela({}, datetime(2024, 3, 20, 14, 3, 27))

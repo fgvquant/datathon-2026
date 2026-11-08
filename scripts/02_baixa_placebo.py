@@ -88,7 +88,7 @@ def main():
                                 ausente, v[6] == "0", k])
             print(f"\r{i}/{len(escolha)} {e}", end="", flush=True)
     print(f"\nSalvo em {saida.relative_to(RAIZ)} ({saida.stat().st_size / 1e6:.1f} MB); "
-          f"velas ausentes preenchidas: {ausentes}")
+          f"velas ausentes (deixadas vazias): {ausentes}")
 
 
 if __name__ == "__main__":
