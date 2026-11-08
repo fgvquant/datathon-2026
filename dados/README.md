@@ -52,7 +52,7 @@ Formato longo: uma linha por ataque × moeda × minuto.
 | `hora_referencia_utc` | horário do anúncio |
 | `open`, `high`, `low`, `close` | preços da vela |
 | `volume`, `quote_volume`, `n_trades`, `taker_buy_base`, `taker_buy_quote` | volumes da vela (Binance) |
-| `vela_ausente` | a Binance não tem a vela; OHLC = último close, volumes 0 |
+| `vela_ausente` | a Binance não tem a vela; preços e volumes ficam vazios (nada é preenchido) |
 | `sem_negocio` | vela sem negócios (`n_trades = 0`) |
 
 Checagens esperadas: 361 velas por ataque e moeda, nenhuma linha repetida, nenhum preço ≤ 0, máxima ≥ mínima e
